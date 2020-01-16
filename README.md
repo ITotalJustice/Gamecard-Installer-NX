@@ -2,7 +2,7 @@
 
 A way to install your gamecards directly to the switch!
 
-![Alt text](images/exmple.gif)
+![Alt text](images/example.gif)
 
 ----
 
