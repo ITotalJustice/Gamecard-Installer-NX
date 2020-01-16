@@ -2,6 +2,8 @@
 
 A way to install your gamecards directly to the switch!
 
+![Img](images/menu.jpg)
+
 ----
 
 ## How to use
