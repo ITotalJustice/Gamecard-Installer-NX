@@ -2,7 +2,7 @@
 
 A way to install your gamecards directly to the switch!
 
-![Img](images/menu.jpg)
+![Alt text](images/exmple.gif)
 
 ----
 
@@ -17,9 +17,9 @@ This should result in a folder struct like this `/switch/gamecard_installer/game
 
 __Multi gamecards__
 
-Some gamecarts have multiple games inside. An example of this is the Child of Light & Valiant Hearts cart.
+Some gamecards have multiple games inside. An example of this is the Child of Light & Valiant Hearts gamecard.
 
-These can still be installed. Pressing `L` or `R` will allow you to cycle through the games on the cart.
+These can still be installed. Pressing `L` or `R` will allow you to cycle through the games on the gamecard.
 
 
 __Playing music__

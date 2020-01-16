@@ -105,14 +105,14 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
 
             strcpy(gamecard->cnmt_name, d->d_name);
             gamecard->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
-            gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 420, Colour_Nintendo_White, lang->name);
-            gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 455, Colour_Nintendo_White, lang->author);
-            gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 490, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
-            gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 525, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(header.key_gen ? header.key_gen : header.old_key_gen));
+            gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, lang->name);
+            gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, lang->author);
+            gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
+            gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(header.key_gen ? header.key_gen : header.old_key_gen));
         }
     }
 
-    gamecard->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 560, Colour_Nintendo_White, "Size: %.2fGB", (float)gamecard->size / 0x40000000);
+    gamecard->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 585, Colour_Nintendo_White, "Size: %.2fGB", (float)gamecard->size / 0x40000000);
     closedir(dir);
     return true;
 }
