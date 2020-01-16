@@ -41,7 +41,7 @@ bool mount_gc(gamecard_t *gamecard);
 void reset_gc(gamecard_t *gamecard);
 
 //
-void unmount_gc(gamecard_t *gamecard);
+bool unmount_gc(gamecard_t *gamecard);
 
 //
 void swap_game_in_gc(gamecard_t *gamecard);

@@ -29,6 +29,9 @@ void exit_menu(void);
 void update_button_spin(void);
 
 //
+void ui_display_error_box(uint32_t err);
+
+//
 void ui_display_progress_bar(const char *name, int speed, int eta_min, int eta_sec, size_t done, size_t remaining);
 
 //

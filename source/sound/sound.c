@@ -9,10 +9,10 @@
 void create_sound_cfg_default(sound_cfg *out)
 {
     out->flags = MIX_INIT_FLAC | MIX_INIT_MOD | MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_MID | MIX_INIT_OPUS;
-    out->freq = DEFAULT_BITRATE;
-    out->format = DEFAULT_FORMAT;
+    out->freq = MIX_DEFAULT_FREQUENCY;
+    out->format = MIX_DEFAULT_FORMAT;
     out->channels = DEFAULT_CHANNELS;
-    out->chunk_size = DEAFULT_CHUNK_SIZE;
+    out->chunk_size = 1024;
     out->volume = 32;
 }
 

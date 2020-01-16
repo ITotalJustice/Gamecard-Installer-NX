@@ -33,6 +33,9 @@ void app_init()
 	#ifdef DEBUG
 	socketInitializeDefault();
 	nxlinkStdio();
+	printf("\ncan you see me?\n");
+	printf("if you can, that would be great\n");
+	printf("otherwise you won't see debug messages :(\n\n");
 	#endif
 
 	init_ns();

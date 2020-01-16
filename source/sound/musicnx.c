@@ -53,7 +53,7 @@ void _scan_for_songs(const char *directory)
 
             // check if we are at the song max.
             if (g_song_total == SONG_MAX)
-                break;
+                return;
         }
     }
 }
@@ -63,8 +63,8 @@ int play_song_thrd(void *in)
     // setup random seed.
     srand(time(NULL));
 
-    // my sleep var. 100th of a second
-    struct timespec sleep_time = { 0, 0x1000000 };
+    // 100th of a second
+    struct timespec sleep_time = { 0, 10000000 };
 
     // loop until the flag is set to false.
     while (g_continue_flag == true)
@@ -76,7 +76,7 @@ int play_song_thrd(void *in)
             play_song(g_songs[rand() % g_song_total], 0);
         }
 
-        // sleep for a few nanoseconds. No need to burn cycles!
+        // sleep for a 100th of a second. No need to burn cycles!
         thrd_sleep(&sleep_time, NULL);
     }
     return 0;
@@ -107,6 +107,8 @@ void exit_musicnx(void)
 
         // free songs.
         for (uint8_t i = 0; i < g_song_total; i++)
+        {
             free_song(g_songs[i]);
+        }
     }
 }

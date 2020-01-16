@@ -44,7 +44,6 @@ const char *g_sound_list[] =
     "romfs:/sound/insert.wav",
     "romfs:/sound/select.wav",
     "romfs:/sound/popup.wav",
-    "sdmc:/switch/gamecard_installer/music.mp3",
 };
 
 
@@ -101,6 +100,7 @@ bool g_gc_inserted = false;
 
 bool init_menu(void)
 {
+    // romfs will contain the empty icon and sound effects.
     if (R_FAILED(romfsInit()))
         return false;
 
@@ -147,7 +147,8 @@ bool init_menu(void)
 
     g_app_icon = create_button(&FONT_BUTTON[QFontSize_45], 65, 30, Colour_Nintendo_White, Font_Button_SETTINGS);
 
-    // unmount romfs as we only needed the empty icon picture.
+    // unmount romfs as we only needed the empty icon picture and sound effects.
+    romfsExit();
     return true;
 }
 
@@ -164,7 +165,6 @@ void exit_menu(void)
     free_sound(insert);
     free_sound(move);
     free_sound(popup);
-    romfsExit();
 }
 
 
@@ -197,9 +197,13 @@ void update_gamecard(void)
 {
     if (poll_gc() != g_gc_inserted)
     {
+        update_button_spin();
         play_sound(insert, -1, 0);
-        g_gc_inserted ? unmount_gc(&gamecard) : mount_gc(&gamecard);
-        g_gc_inserted = !g_gc_inserted;
+        bool ret = g_gc_inserted ? unmount_gc(&gamecard) : mount_gc(&gamecard);
+
+        // mounting the gamecard can fail, only set flag to true if the gamecard is mounted.
+        if (ret)
+            g_gc_inserted = !g_gc_inserted;
     }
 }
 
@@ -305,7 +309,7 @@ void ui_display_yes_no_box(const char *message)
     SDL_UpdateRenderer();
 }
 
-void ui_display_error_box(const char *message)
+void ui_display_error_box(uint32_t err)
 {
     // display the popup box.
     ui_display_popup_box();
@@ -313,13 +317,27 @@ void ui_display_error_box(const char *message)
     // play the error sound effect.
     play_sound(error, -1, 0);
 
-    // TODO.
+    SDL_Rect box = { 455, 470, 365, 65 };
+    SDL_DrawButton(FONT_BUTTON[QFontSize_63].fnt, 0xE140, 608, 190, Colour_Nintendo_Red);
+    SDL_DrawText(FONT_TEXT[QFontSize_25].fnt, 520, 290, Colour_Nintendo_White, "Error code: 0x%04X", err);
+    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 340, 360, Colour_Nintendo_BrightSilver, "If this message appears repeatedly, please open an issue.");
+    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 320, 405, Colour_Nintendo_BrightSilver, "https://github.com/ITotalJustice/Gamecard-Installer-NX/issues");
+    SDL_DrawShapeOutline(Colour_Nintendo_Cyan, box.x, box.y, box.w, box.h, 5);
+    SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, 620, box.y + 25, Colour_Nintendo_White, "OK");
 
     // update the screen.
     SDL_UpdateRenderer();
 
-    // delay for 3 seconds until exit.
-    SDL_Delay(3000);
+    // delay for 1 second so that users will see the error, even if they're mashing buttons.
+    SDL_Delay(1000);
+
+    // loop until the user selects okay!
+    while (appletMainLoop())
+    {
+        input_t input = get_input();
+        if (input.down & KEY_A || input.down & KEY_B)
+            break;
+    }
 }
 
 void ui_display_progress_bar(const char *name, int speed, int eta_min, int eta_sec, size_t done, size_t remaining)
@@ -393,9 +411,18 @@ uint8_t handle_input(void)
         play_sound(popup, -1, 0);
         switch (g_cursor)
         {
-            case Option_Nand: install_gc(&gamecard, NcmStorageId_BuiltInUser); break;
-            case Option_SD: install_gc(&gamecard, NcmStorageId_SdCard); break;
-            case Option_Exit: return Option_Exit;
+            case Option_Nand:
+                if (!install_gc(&gamecard, NcmStorageId_BuiltInUser))
+                    ncm_delete_all_placeholders();
+                update_storage_size();
+                break;
+            case Option_SD:
+                if (!install_gc(&gamecard, NcmStorageId_SdCard))
+                    ncm_delete_all_placeholders();
+                update_storage_size();
+                    break;
+            case Option_Exit:
+                return Option_Exit;
         }
     }
 
@@ -428,7 +455,6 @@ void start_menu(void)
         SDL_ClearRenderer();
         render_menu();
         SDL_UpdateRenderer();
-        //ui_display_yes_no_box("Install to the Nand?");
     }
 
     unmount_gc(&gamecard);

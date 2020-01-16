@@ -534,6 +534,7 @@ uint8_t fs_get_gamecard_attribute(FsDeviceOperator *d, const FsGameCardHandle *h
 void fs_close_device_operator(FsDeviceOperator *d)
 {
     fsDeviceOperatorClose(d);
+    serviceClose(&d->s);
 }
 
 
@@ -659,12 +660,13 @@ bool fs_mount_gamecard_partition(char *out, const FsGameCardHandle handle, FsGam
     if (!fs_open_gamecard(handle, partition, &fs))
         return false;
     
-    char partition_letters[] = { 'U', 'N', 'S' };
+    const char partition_letters[] = { 'U', 'N', 'S' };
     snprintf(out, 0x10, "@Gc%c%08x", partition_letters[partition], handle.value);
     
     if (fsdevMountDevice(out, fs) != -1)
         return true;
 
+    printf("failed to mount device %s\n", out);
     fsFsClose(&fs);
     return false;
 }

@@ -2,7 +2,7 @@
 #define _FONT_H_
 
 
-#define FONT_MAX 10
+#define FONT_MAX 14
 
 #include <SDL2/SDL_ttf.h>
 
@@ -19,6 +19,10 @@ typedef enum
     QFontSize_33,
     QFontSize_35,
     QFontSize_45,
+    QFontSize_48,
+    QFontSize_60,
+    QFontSize_63,
+    QFontSize_72,
 } QFontSize;
 
 typedef struct

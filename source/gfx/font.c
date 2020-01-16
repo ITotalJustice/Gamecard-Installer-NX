@@ -34,7 +34,7 @@ void init_font()
     plGetSharedFontByType(&font, PlSharedFontType_Standard);
     plGetSharedFontByType(&button, PlSharedFontType_NintendoExt);
 
-    int font_sizes[] = { 15, 18, 20, 23, 25, 28, 30, 33, 35, 45 };
+    int font_sizes[] = { 15, 18, 20, 23, 25, 28, 30, 33, 35, 45, 48, 60, 63, 72 };
 
     for (uint8_t i = 0; i < FONT_MAX; i++)
     {
