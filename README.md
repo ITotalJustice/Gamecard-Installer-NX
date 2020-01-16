@@ -13,6 +13,13 @@ Download the latest release and unzip the contents to the root of the sd card.
 This should result in a folder struct like this `/switch/gamecard_installer/gamecard_installer.nro`.
 
 
+__Multi gamecards__
+
+Some gamecarts have multiple games inside. An example of this is the Child of Light & Valiant Hearts cart.
+
+These can still be installed. Pressing `L` or `R` will allow you to cycle through the games on the cart.
+
+
 __Playing music__
 
 This app can play music!
@@ -20,6 +27,8 @@ This app can play music!
 Simply drop any .mp3 files into `/switch/gamecard_installer/`.
 
 You can have the .mp3 in folders if you prefer, the app will scan recursively. E.g. `/switch/gamecard_installer/music/song.mp3`.
+
+[Here's a great site for high quality video game music.](https://downloads.khinsider.com/)
 
 ----
 
