@@ -100,6 +100,9 @@ bool g_gc_inserted = false;
 
 bool init_menu(void)
 {
+    // delete all exiting placeholders.
+    ncm_delete_all_placeholders();
+    
     // romfs will contain the empty icon and sound effects.
     if (R_FAILED(romfsInit()))
         return false;
@@ -165,6 +168,7 @@ void exit_menu(void)
     free_sound(insert);
     free_sound(move);
     free_sound(popup);
+    unmount_gc(&gamecard);
 }
 
 
@@ -404,7 +408,7 @@ uint8_t handle_input(void)
 
     if (input.down & KEY_B)
         return Option_Exit;
-        
+
     if (input.t_count)
     {
         int ret = check_if_option(&input);
@@ -446,11 +450,6 @@ uint8_t handle_input(void)
 
 void start_menu(void)
 {
-    // delete all exiting placeholders.
-    // this ensures that no temp files are left over, should the app ever crash.
-    ncm_delete_all_placeholders();
-
-    // muh loop.
     while (appletMainLoop())
     {
         // get input.
@@ -465,6 +464,4 @@ void start_menu(void)
         render_menu();
         SDL_UpdateRenderer();
     }
-
-    unmount_gc(&gamecard);
 }
