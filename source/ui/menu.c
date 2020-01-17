@@ -102,7 +102,7 @@ bool init_menu(void)
 {
     // delete all exiting placeholders.
     ncm_delete_all_placeholders();
-    
+
     // romfs will contain the empty icon and sound effects.
     if (R_FAILED(romfsInit()))
         return false;
@@ -284,7 +284,7 @@ void ui_display_button_spin(void)
     SDL_DrawButton(FONT_BUTTON[QFontSize_33].fnt, g_button_spin, 50, SCREEN_H - 50, Colour_Nintendo_White);
 }
 
-void ui_display_popup_box(void)
+void ui_display_dim_background(void)
 {
     // clear the renderer.
     SDL_ClearRenderer();
@@ -298,19 +298,60 @@ void ui_display_popup_box(void)
     SDL_Rect rect = { 0, 0, SCREEN_W, SCREEN_H };
     SDL_RenderFillRect(SDL_GetRenderer(SDL_GetWindow()), &rect);
     SDL_SetRenderDrawBlendMode(SDL_GetRenderer(SDL_GetWindow()), SDL_BLENDMODE_NONE);
+}
+
+void ui_display_popup_box(void)
+{
+    ui_display_dim_background();
 
     // The pop up shape.
     SDL_Rect box = { 255, 145, 770, 430 };
     SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
 }
 
-void ui_display_yes_no_box(const char *message)
+bool ui_display_yes_no_box(const char *message)
 {
-    ui_display_popup_box();
+    uint8_t cursor = 1;
 
-    // TODO.
+    while (appletMainLoop())
+    {
+        input_t input = get_input();
+        if (input.down & KEY_RIGHT)
+            cursor = 1;
+        if (input.down & KEY_LEFT)
+            cursor = 0;
+        
+        int ret = check_if_touch_yesno(&input);
+        if (ret != -1)
+        {
+            cursor = ret;
+            input.down |= KEY_A;
+        }
 
-    SDL_UpdateRenderer();
+        if (input.down & KEY_A)
+            return cursor;
+
+        if (input.down & KEY_B)
+            return false;
+
+        ui_display_dim_background();
+
+        // The pop up shape.
+        SDL_Rect box = { 255, 210, 770, 295 };
+        SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
+
+        // display the message.
+        SDL_DrawTextCenterX(FONT_TEXT[QFontSize_25].fnt, box.y + 110, box.x, box.w, Colour_Nintendo_White, message);
+
+        // 
+        SDL_DrawShape(Colour_Nintendo_LightSilver, box.x, (box.y + box.h) - 72, 770, 2, true);
+        SDL_DrawShapeOutline(Colour_Nintendo_Cyan, cursor ? box.x + 380 : 250, box.y + 220, 390, 75, 5);
+        SDL_DrawTextCenterX(FONT_TEXT[QFontSize_25].fnt, (box.y + box.h) - 50, box.x + (box.w / 2), box.w / 2, Colour_Nintendo_Cyan, "OK");
+        SDL_DrawTextCenterX(FONT_TEXT[QFontSize_25].fnt, (box.y + box.h) - 50, box.x, box.w / 2, Colour_Nintendo_Cyan, "Back");
+
+        SDL_UpdateRenderer();
+    }
+    return false;
 }
 
 void ui_display_error_box(uint32_t err)
@@ -407,16 +448,16 @@ uint8_t handle_input(void)
     }
 
     if (input.down & KEY_B)
-        return Option_Exit;
-
-    if (input.t_count)
     {
-        int ret = check_if_option(&input);
-        if (ret != -1)
-        {
-            g_cursor = ret;
-            input.down |= KEY_A;
-        }
+        if (ui_display_yes_no_box("would you like to exit?"))
+            return Option_Exit;  
+    }
+
+    int ret = check_if_option(&input);
+    if (ret != -1)
+    {
+        g_cursor = ret;
+        input.down |= KEY_A;
     }
 
     if (input.down & KEY_A)
@@ -425,20 +466,32 @@ uint8_t handle_input(void)
         switch (g_cursor)
         {
             case Option_Nand:
-                if (!install_gc(&gamecard, NcmStorageId_BuiltInUser))
-                    ncm_delete_all_placeholders();
-                update_storage_size();
+                if (g_gc_inserted)
+                {
+                    if (ui_display_yes_no_box("Install to the Nand?"))
+                    {
+                        if (!install_gc(&gamecard, NcmStorageId_BuiltInUser))
+                            ncm_delete_all_placeholders();
+                        update_storage_size();
+                    }
+                }
                 break;
             case Option_SD:
-                if (!install_gc(&gamecard, NcmStorageId_SdCard))
-                    ncm_delete_all_placeholders();
-                update_storage_size();
-                    break;
+                if (g_gc_inserted)
+                {
+                    if (ui_display_yes_no_box("Install to the Sd Card?"))
+                    {
+                        if (!install_gc(&gamecard, NcmStorageId_SdCard))
+                            ncm_delete_all_placeholders();
+                        update_storage_size();
+                    }
+                }
+                break;
             case Option_Exit:
-                return Option_Exit;
+                if (ui_display_yes_no_box("Would you like to exit?"))
+                    return Option_Exit;
         }
     }
-
     return 0;
 }
 

@@ -20,6 +20,13 @@ typedef struct
 //
 input_t get_input(void);
 
+// this is used to check if the user was already touching the screen when entering a function that checks for screen touches.
+// this is useful to know whether to lock touching until the user touches the screen again.
+bool is_touch(void);
+
+//
+int check_if_touch_yesno(const input_t *input);
+
 //
 bool check_if_touch_error(void);
 

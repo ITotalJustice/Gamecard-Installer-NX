@@ -124,6 +124,21 @@ void SDL_DrawText(TTF_Font *font, int x, int y, Colour colour, const char *text,
     SDL_DestroyTexture(tex);
 }
 
+void SDL_DrawTextCenterX(TTF_Font *font, int y, int clip_x, int clip_w, Colour colour, const char *text, ...)
+{
+    char full_text[0x100];
+    va_list argv;
+    va_start(argv, text);
+    vsnprintf(full_text, sizeof(full_text), text, argv);
+    va_end(argv);
+
+    int t_w = 0;
+    int t_h = 0;
+    SDL_GetTextSize(font, &t_w, &t_h, full_text);
+
+    SDL_DrawText(font, ((clip_w - t_w) / 2) + clip_x, y, colour, full_text);
+}
+
 void SDL_DrawButton(TTF_Font *font, uint16_t btn, int x, int y, Colour colour)
 {
     SDL_Colour col = SDL_GetColour(colour);

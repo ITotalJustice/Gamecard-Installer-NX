@@ -131,6 +131,7 @@ SDL_Texture *SDL_ImageLoad(const char *path);                                   
 SDL_Texture *SDL_ImageLoadMem(void *data, int size);                                    //load image from memory
 
 void SDL_DrawText(TTF_Font *font, int x, int y, Colour colour, const char *text, ...);  //draw text to screen
+void SDL_DrawTextCenterX(TTF_Font *font, int y, int clip_x, int clip_w, Colour colour, const char *text, ...);
 void SDL_DrawButton(TTF_Font *font, uint16_t btn, int x, int y, Colour colour);         //draw button to screen
 void SDL_DrawImage(SDL_Texture *texture, int x, int y);                                 //draw image to screen from texture
 void SDL_DrawImageRotate(SDL_Texture *texture, int x, int y, double rotate);
@@ -148,6 +149,7 @@ void SDL_ScreenShotToFile(const char *save_path);
 
 int SDL_GetTextureWidth(SDL_Texture *texture);
 int SDL_GetTextureHeight(SDL_Texture *texture);
+void SDL_GetTextSize(TTF_Font *font, int *w, int *h, const char *text, ...);
 
 void SDL_ClearRenderer(void);                                                           //clear the screen
 void SDL_UpdateRenderer(void);                                                          //update the screen
