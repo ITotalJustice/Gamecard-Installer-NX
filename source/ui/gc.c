@@ -257,6 +257,13 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
+    if (ns_get_storage_free_space(storage_id) <= gamecard->size)
+    {
+        printf("not enough free space.");
+        ui_display_error_box(ErrorCode_Install_NoSpace);
+        return false;
+    }
+
     NcmContentId content_id = nca_get_id_from_string(gamecard->cnmt_name);
     if (!nca_start_install(content_id, storage_id))
     {

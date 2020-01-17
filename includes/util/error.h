@@ -28,8 +28,9 @@ typedef enum
     ErrorCode_Install_CnmtNca   = 0x5004,
     ErrorCode_Install_Cnmt      = 0x5008,
     ErrorCode_Install_Nca       = 0x5010,
+    ErrorCode_Install_NoSpace   = 0x5020,
 
-    ErrorCode_Install_UNK       = 0xFFFF,
+    ErrorCode_Unknown           = 0xFFFF,
 } ErrorCodes;
 
 
