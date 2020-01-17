@@ -12,10 +12,8 @@
 
 #include "ui/menu.h"
 
-#include "gfx/SDL_easy.h"
-#include "gfx/font.h"
-
 #include "util/file.h"
+#include "util/log.h"
 
 
 mtx_t nca_mtx = {0};
@@ -42,7 +40,7 @@ bool nca_check_if_magic_valid(uint32_t magic)
         case NCA3_MAGIC: return true;
         default:
         {
-            printf("incorrect nca magic. got %u\n", magic);
+            write_log("incorrect nca magic. got %u\n", magic);
             return false;
         }
     }
@@ -233,7 +231,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
             nca.fp = open_file2("rb", "%s%s", nca_get_string_from_id(content_id, nca_string), ".ncz");
             if (!nca.fp)
             {
-                printf("failed to open nca file... %s\n", nca_string);
+                write_log("failed to open nca file... %s\n", nca_string);
                 return false;
             }
         }
@@ -243,14 +241,14 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     nca_header_t *header = calloc(1, NCA_XTS_SECTION_SIZE);
     if (!header)
     {
-        printf("failed to malloc header\n");
+        write_log("failed to malloc header\n");
         fclose(nca.fp);
         return false;
     }
 
     if (!nca_get_header_decrypted(nca.fp, 0, header))
     {
-        printf("failed to get nca header\n");
+        write_log("failed to get nca header\n");
         fclose(nca.fp);
         free(header);
         return false;
@@ -259,7 +257,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     // now that we have the actual size of the nca, we can setup the placeholder.
     if (!nca_setup_placeholder(&nca.ncm, header->size, &content_id, storage_id))
     {
-        printf("failed to setup placeholder\n");
+        write_log("failed to setup placeholder\n");
         fclose(nca.fp);
         free(header);
         return false;
@@ -277,7 +275,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     // now write the header to the placeholder.
     if (R_FAILED(ncm_write_placeholder(&nca.ncm.storage, &nca.ncm.placeholder_id, 0, header, NCA_XTS_SECTION_SIZE)))
     {
-        printf("failed to setup placeholder\n");
+        write_log("failed to setup placeholder\n");
         fclose(nca.fp);
         free(header);
         ncm_close_storage(&nca.ncm.storage);
@@ -344,7 +342,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
 
     if (R_FAILED(ncm_register_placeholder(&nca.ncm.storage, &nca.ncm.content_id, &nca.ncm.placeholder_id)))
     {
-        printf("failed to register placeholder\n");
+        write_log("failed to register placeholder\n");
         ncm_close_storage(&nca.ncm.storage);
         fclose(nca.fp);
         return false;

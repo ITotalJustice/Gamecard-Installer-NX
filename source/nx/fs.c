@@ -5,7 +5,8 @@
 #include <string.h>
 #include <switch.h>
 
-#include "fs.h"
+#include "nx/fs.h"
+#include "util/log.h"
 
 
 /*
@@ -22,7 +23,7 @@ Result fs_open_file(FsFileSystem *system, u32 mode, FsFile *file, const char *pa
 
     Result rc = fsFsOpenFile(system, new_path, mode, file);
     if (R_FAILED(rc))
-        printf("failed to open file %s\n", new_path);
+        write_log("failed to open file %s\n", new_path);
     return rc;
 }
 
@@ -30,7 +31,7 @@ Result fs_create_file(FsFileSystem *system, const char *path, int64_t size, u32 
 {
     Result rc = fsFsCreateFile(system, path, size, option);
     if (R_FAILED(rc))
-        printf("failed to create file %s\n", path);
+        write_log("failed to create file %s\n", path);
     return rc;
 }
 
@@ -38,7 +39,7 @@ Result fs_delete_file(FsFileSystem *system, const char *path)
 {
     Result rc = fsFsDeleteFile(system, path);
     if (R_FAILED(rc))
-        printf("failed to delete file %s\n", path);
+        write_log("failed to delete file %s\n", path);
     return rc;
 }
 
@@ -46,7 +47,7 @@ Result fs_rename_file(FsFileSystem *system, const char *old, const char *new)
 {
     Result rc = fsFsRenameFile(system, old, new);
     if (R_FAILED(rc))
-        printf("failed to rename old file %s to %s\n", old, new);
+        write_log("failed to rename old file %s to %s\n", old, new);
     return rc;
 }
 
@@ -54,7 +55,7 @@ int64_t fs_get_file_size(FsFile *file)
 {
     int64_t size = 0;
     if (R_FAILED(fsFileGetSize(file, &size)))
-        printf("failed to get file size\n");
+        write_log("failed to get file size\n");
     return size;
 }
 
@@ -62,7 +63,7 @@ Result fs_set_file_size(FsFile *file, int64_t size)
 {
     Result rc = fsFileSetSize(file, size);
     if (R_FAILED(rc))
-        printf("failed to set file size ...\n");
+        write_log("failed to set file size ...\n");
     return rc;
 }
 
@@ -70,9 +71,9 @@ size_t fs_read_file(void *out, uint64_t size, int64_t offset, u32 option, FsFile
 {
     size_t total = 0;
     if (R_FAILED(fsFileRead(file, offset, out, size, option, &total)))
-        printf("failed to read file\n");
+        write_log("failed to read file\n");
     if (total != size)
-        printf("file read missmatch! total = %ld size = %ld\n", total, size);
+        write_log("file read missmatch! total = %ld size = %ld\n", total, size);
     return total;
 }
 
@@ -80,7 +81,7 @@ Result fs_write_file(FsFile *file, uint64_t offset, void *out, uint64_t size, u3
 {
     Result rc = fsFileWrite(file, offset, out, size, option);
     if (R_FAILED(rc))
-        printf("failed to write to file ...\n");
+        write_log("failed to write to file ...\n");
     return rc;
 }
 
@@ -88,7 +89,7 @@ Result fs_flush_file(FsFile *file)
 {
     Result rc = fsFileFlush(file);
     if (R_FAILED(rc))
-        printf("failed to flush file ...\n");
+        write_log("failed to flush file ...\n");
     return rc;
 }
 
@@ -113,7 +114,7 @@ Result fs_open_dir(FsFileSystem *system, u32 mode, FsDir *dir, const char *path,
 
     Result rc = fsFsOpenDirectory(system, new_path, mode, dir);
     if (R_FAILED(rc))
-        printf("failed to open dir %s\n", new_path);
+        write_log("failed to open dir %s\n", new_path);
     return rc;
 }
 
@@ -121,7 +122,7 @@ Result fs_create_dir(FsFileSystem *system, const char *path)
 {
     Result rc = fsFsCreateDirectory(system, path);
     if (R_FAILED(rc))
-        printf("failed to create dir %s\n", path);
+        write_log("failed to create dir %s\n", path);
     return rc;
 }
 
@@ -129,7 +130,7 @@ Result fs_delete_dir(FsFileSystem *system, const char *path)
 {
     Result rc = fsFsDeleteDirectory(system, path);
     if (R_FAILED(rc))
-        printf("failed to delete dir %s\n", path);
+        write_log("failed to delete dir %s\n", path);
     return rc;
 }
 
@@ -137,7 +138,7 @@ Result fs_delete_dir_rec(FsFileSystem *system, const char *path)
 {
     Result rc = fsFsDeleteDirectoryRecursively(system, path);
     if (R_FAILED(rc))
-        printf("failed to delete dir recursively %s\n", path);
+        write_log("failed to delete dir recursively %s\n", path);
     return rc;
 }
 
@@ -145,9 +146,9 @@ int64_t fs_read_dir(FsDir *dir, size_t max_files, FsDirectoryEntry *out)
 {
     int64_t total = 0;
     if (R_FAILED(fsDirRead(dir, &total, max_files, out)))
-        printf("failed to read dir\n");
+        write_log("failed to read dir\n");
     if (total != max_files)
-        printf("number of files read missmatch! total = %ld max_files = %ld\n", total, max_files);
+        write_log("number of files read missmatch! total = %ld max_files = %ld\n", total, max_files);
     return total;
 }
 
@@ -155,7 +156,7 @@ int64_t fs_get_dir_total(FsDir *dir)
 {
     int64_t total = 0;
     if (R_FAILED(fsDirGetEntryCount(dir, &total)))
-        printf("failed get total\n");
+        write_log("failed get total\n");
     return total;
 }
 
@@ -184,7 +185,7 @@ bool fs_search_dir_for_file_2(FsDir *dir, FsDirectoryEntry *out, const char *fil
         }
     }
     
-    printf("couldn't find file %s\n", file);
+    write_log("couldn't find file %s\n", file);
     return false;
 }
 
@@ -249,7 +250,7 @@ Result fs_open_system(FsFileSystem *out, FsFileSystemType fs_type, const char *p
 
     Result rc = fsOpenFileSystem(out, fs_type, new_path);
     if (R_FAILED(rc))
-        printf("failed to open file system %s\n", new_path);
+        write_log("failed to open file system %s\n", new_path);
     return rc;
 }
 
@@ -257,7 +258,7 @@ Result fs_open_system_with_id(FsFileSystem *out, uint64_t id, FsFileSystemType f
 {
     Result rc = fsOpenFileSystemWithId(out, id, fs_type, path);
     if (R_FAILED(rc))
-        printf("failed to open file system with ID %s\n", path);
+        write_log("failed to open file system with ID %s\n", path);
     return rc;
 }
 
@@ -265,7 +266,7 @@ Result fs_open_system_with_patch(FsFileSystem *out, uint64_t id, FsFileSystemTyp
 {
     Result rc = fsOpenFileSystemWithPatch(out, id, fs_type);
     if (R_FAILED(rc))
-        printf("failed to open file system with patch %ld\n", id);
+        write_log("failed to open file system with patch %ld\n", id);
     return rc;
 }
 
@@ -273,7 +274,7 @@ Result fs_open_sd_card(FsFileSystem *out, const char *path)
 {
     Result rc = fs_open_system(out, FsContentStorageId_SdCard, path);
     if (R_FAILED(rc))
-        printf("failed to open sd card\n");
+        write_log("failed to open sd card\n");
     return rc;
 }
 
@@ -281,7 +282,7 @@ Result fs_open_nand(FsFileSystem *out, const char *path)
 {
     Result rc = fs_open_system(out, FsContentStorageId_User, path);
     if (R_FAILED(rc))
-        printf("failed to open nand\n");
+        write_log("failed to open nand\n");
     return rc;
 }
 
@@ -290,7 +291,7 @@ bool fs_open_gamecard(FsGameCardHandle handle, FsGameCardPartition partition, Fs
     Result rc = fsOpenGameCardFileSystem(out, &handle, partition);
     if (R_SUCCEEDED(rc))
         return true;
-    printf("failed to open gamecard...\n");
+    write_log("failed to open gamecard...\n");
     return false;
 }
 
@@ -305,7 +306,7 @@ int64_t fs_get_system_free_space(FsFileSystem *system, const char *path, ...)
     int64_t size = 0;
     Result rc = fsFsGetFreeSpace(system, new_path, &size);
     if (R_FAILED(rc))
-        printf("failed to get system free space from path %s\n", new_path);
+        write_log("failed to get system free space from path %s\n", new_path);
     return size;
 }
 
@@ -317,7 +318,7 @@ int64_t fs_get_sd_free_space(void)
     if (R_FAILED(rc = fs_open_sd_card(&fs, "/")))
         return size;
     if (R_FAILED(fsFsGetFreeSpace(&fs, "/", &size)))
-        printf("failed to get sd card free space\n");
+        write_log("failed to get sd card free space\n");
     fs_close_system(&fs);
     return size;
 }
@@ -330,7 +331,7 @@ int64_t fs_get_nand_free_space(void)
     if (R_FAILED(rc = fs_open_nand(&fs, "/")))
         return size;
     if (R_FAILED(fsFsGetFreeSpace(&fs, "/", &size)))
-        printf("failed to get nand free space\n");
+        write_log("failed to get nand free space\n");
     fs_close_system(&fs);
     return size;
 }
@@ -372,7 +373,7 @@ int64_t fs_get_total_system_size(FsFileSystem *system, const char *path, ...)
     int64_t size = 0;
     Result rc = fsFsGetTotalSpace(system, new_path, &size);
     if (R_FAILED(rc))
-        printf("failed to get total system size from path %s\n", new_path);
+        write_log("failed to get total system size from path %s\n", new_path);
     return size;
 }
 
@@ -391,7 +392,7 @@ Result fs_open_storage_by_current_process(FsStorage *out)
 {
     Result rc = fsOpenDataStorageByCurrentProcess(out);
     if (R_FAILED(rc))
-        printf("failed to open storage by current process\n");
+        write_log("failed to open storage by current process\n");
     return rc;
 }
 
@@ -399,7 +400,7 @@ Result fs_open_storage_by_id(FsStorage *out, u_int64_t data_id, NcmStorageId sto
 {
     Result rc = fsOpenDataStorageByDataId(out, data_id, storage_id);
     if (R_FAILED(rc))
-        printf("failed to open stoarge using data id %lu\n", data_id);
+        write_log("failed to open stoarge using data id %lu\n", data_id);
     return rc;
 }
 
@@ -429,7 +430,7 @@ Result fs_read_storage(FsStorage *storage, void *out, uint64_t size, int64_t off
 {
     Result rc = fsStorageRead(storage, offset, out, size);
     if (R_FAILED(rc))
-        printf("failed to read storage...\n");
+        write_log("failed to read storage...\n");
     return rc;
 }
 
@@ -437,7 +438,7 @@ Result fs_write_storage(FsStorage *storage, const void *in, uint64_t size, int64
 {
     Result rc = fsStorageWrite(storage, offset, in, size);
     if (R_FAILED(rc))
-        printf("failed to write to storage...\n");
+        write_log("failed to write to storage...\n");
     return rc;
 }
 
@@ -445,7 +446,7 @@ Result fs_flush_storage(FsStorage *storage)
 {
     Result rc = fsStorageFlush(storage);
     if (R_FAILED(rc))
-        printf("failed to flush storage...\n");
+        write_log("failed to flush storage...\n");
     return rc;
 }
 
@@ -453,7 +454,7 @@ int64_t fs_get_storage_size(FsStorage *storage)
 {
     int64_t size = 0;
     if (R_FAILED(fsStorageGetSize(storage, &size)))
-        printf("failed to get storage size...\n");
+        write_log("failed to get storage size...\n");
     return size;
 }
 
@@ -461,7 +462,7 @@ Result fs_set_storage_size(FsStorage *storage, int64_t size)
 {
     Result rc = fsStorageSetSize(storage, size);
     if (R_FAILED(rc))
-        printf("failed to set storage size to %ld...\n", size);
+        write_log("failed to set storage size to %ld...\n", size);
     return rc;
 }
 
@@ -480,7 +481,7 @@ Result fs_open_device_operator(FsDeviceOperator *out)
 {
     Result rc = fsOpenDeviceOperator(out);
     if (R_FAILED(rc))
-        printf("failed to open device operator...\n");
+        write_log("failed to open device operator...\n");
     return rc;
 }
 
@@ -488,7 +489,7 @@ bool fs_is_sdcard_inserted(FsDeviceOperator *d)
 {
     bool inserted = false;
     if (R_FAILED(fsDeviceOperatorIsSdCardInserted(d, &inserted)))
-        printf("failed to check if sd card is inserted...\n");
+        write_log("failed to check if sd card is inserted...\n");
     return inserted;
 }
 
@@ -496,7 +497,7 @@ bool fs_is_gamecard_inserted(FsDeviceOperator *d)
 {
     bool inserted = false;
     if (R_FAILED(fsDeviceOperatorIsGameCardInserted(d, &inserted)))
-        printf("failed to check if sd card is inserted...\n");
+        write_log("failed to check if sd card is inserted...\n");
     return inserted;
 }
 
@@ -519,7 +520,7 @@ Result fs_get_gamecard_handle_from_device_operator(FsDeviceOperator *d, FsGameCa
 {
     Result rc = fsDeviceOperatorGetGameCardHandle(d, out);
     if (R_FAILED(rc))
-        printf("failed to get gamecard handle...\n");
+        write_log("failed to get gamecard handle...\n");
     return rc;
 }
 
@@ -527,7 +528,7 @@ uint8_t fs_get_gamecard_attribute(FsDeviceOperator *d, const FsGameCardHandle *h
 {
     uint8_t attribute = 0;
     if (R_FAILED(fsDeviceOperatorGetGameCardAttribute(d, handle, &attribute)))
-        printf("failed to get game card attribute...\n");
+        write_log("failed to get game card attribute...\n");
     return attribute;
 }
 
@@ -555,7 +556,7 @@ Result fs_set_archive_bit(const char *path, ...)
     if (R_FAILED(rc = fs_open_sd_card(&fs, "/")))
         return rc;
     if (R_FAILED(rc = fsFsSetConcatenationFileAttribute(&fs, new_path)))
-        printf("failed to set archive bit for %s\n", new_path);
+        write_log("failed to set archive bit for %s\n", new_path);
     fs_close_system(&fs);
     return rc;
 }
@@ -564,7 +565,7 @@ bool fs_is_exfat_supported(void)
 {
     bool supported = 0;
     if (R_FAILED(fsIsExFatSupported(&supported)))
-        printf("failed to check if exfat is supported...\n");
+        write_log("failed to check if exfat is supported...\n");
     return supported;
 }
 
@@ -593,7 +594,7 @@ bool fs_open_sd_card_event_notifier(FsEventNotifier *out)
     Result rc = serviceDispatch(fsGetServiceSession(), 500, .out_num_objects = 1, .out_objects = &out->s);
     if (R_SUCCEEDED(rc))
         return true;
-    printf("sdcard event %08X\n", rc);
+    write_log("sdcard event %08X\n", rc);
     return false;
 }
 
@@ -602,7 +603,7 @@ bool fs_open_game_card_event_notifier(FsEventNotifier *out)
     Result rc = serviceDispatch(fsGetServiceSession(), 501, .out_num_objects = 1, .out_objects = &out->s);
     if (R_SUCCEEDED(rc))
         return true;
-    printf("gamecard event %08X\n", rc);
+    write_log("gamecard event %08X\n", rc);
     return false;
 }
 
@@ -614,7 +615,7 @@ bool fs_open_sys_update_notifier(FsEventNotifier *out)
     Result rc = serviceDispatch(fsGetServiceSession(), 510, .out_num_objects = 1, .out_objects = &out->s);
     if (R_SUCCEEDED(rc))
         return true;
-    printf("sdcard event %08X\n", rc);
+    write_log("sdcard event %08X\n", rc);
     return false;
 }
 
@@ -636,7 +637,7 @@ Result fs_mount_sd_card(void)
 {
     Result rc = fsdevMountSdmc();
     if (R_FAILED(rc))
-        printf("failed to mount sd card");
+        write_log("failed to mount sd card");
     return rc;
 }
 
@@ -644,7 +645,7 @@ int fs_mount_device(const char *name, FsFileSystem fs)
 {
     int rc = fsdevMountDevice(name, fs);
     if (rc == -1)
-        printf("failed to mount device %s", name);
+        write_log("failed to mount device %s", name);
     return rc;
 }
 
@@ -666,7 +667,7 @@ bool fs_mount_gamecard_partition(char *out, const FsGameCardHandle handle, FsGam
     if (fsdevMountDevice(out, fs) != -1)
         return true;
 
-    printf("failed to mount device %s\n", out);
+    write_log("failed to mount device %s\n", out);
     fsFsClose(&fs);
     return false;
 }
@@ -686,7 +687,7 @@ Result fs_umount_all_devices(void)
 {
     Result rc = fsdevUnmountAll();
     if (R_FAILED(rc))
-        printf("failed to unmount all devices");
+        write_log("failed to unmount all devices");
     return rc;
 }
 

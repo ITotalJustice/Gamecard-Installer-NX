@@ -17,6 +17,7 @@
 #include "util/file.h"
 #include "util/util.h"
 #include "util/error.h"
+#include "util/log.h"
 
 
 typedef struct
@@ -40,7 +41,7 @@ bool init_gc(void)
 {
     if (R_FAILED(fs_open_device_operator(&g_dop)))
     {
-        printf("failed to mount gcop\n");
+        write_log("failed to mount gcop\n");
         ui_display_error_box(ErrorCode_Init_Gc);
         return false;
     }
@@ -65,7 +66,7 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
     DIR *dir = open_dir(".");
     if (!dir)
     {
-        printf("failed to open dir %s\n", ".");
+        write_log("failed to open dir %s\n", ".");
         ui_display_error_box(ErrorCode_Dir_Setup);
         fs_unmount_device(g_gc_mount_path);
         return false;
@@ -76,7 +77,7 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
         FILE *fp = fopen(d->d_name, "rb");
         if (!fp)
         {
-            printf("failed to somehow open file in gamecard %s\n", d->d_name);
+            write_log("failed to somehow open file in gamecard %s\n", d->d_name);
             ui_display_error_box(ErrorCode_File_Setup);
             closedir(dir);
             fs_unmount_device(g_gc_mount_path);
@@ -128,7 +129,7 @@ bool save_cnmt_path(void)
     DIR *dir = open_dir(".");
     if (!dir)
     {
-        printf("failed to open dir %s\n", ".");
+        write_log("failed to open dir %s\n", ".");
         ui_display_error_box(ErrorCode_Dir_Cnmt);
         return false;
     }
@@ -144,7 +145,7 @@ bool save_cnmt_path(void)
             FILE *fp = fopen(d->d_name, "rb");
             if (!fp)
             {
-                printf("failed to somehow open file in gamecard %s\n", d->d_name);
+                write_log("failed to somehow open file in gamecard %s\n", d->d_name);
                 ui_display_error_box(ErrorCode_File_Cnmt);
                 closedir(dir);
                 return false;
@@ -168,21 +169,21 @@ bool mount_gc(gamecard_t *gamecard)
 {
     if (R_FAILED(fs_get_gamecard_handle_from_device_operator(&g_dop, &g_gc_handle)))
     {
-        printf("failed to get gc handle\n");
+        write_log("failed to get gc handle\n");
         ui_display_error_box(ErrorCode_Mount_Handle);
         return false;
     }
 
     if (!fs_mount_gamecard_partition(g_gc_mount_path, g_gc_handle, FsGameCardPartition_Secure))
     {
-        printf("failed to mount gc\n");
+        write_log("failed to mount gc\n");
         ui_display_error_box(ErrorCode_Mount_Partition);
         return false;
     }
     
     if (!change_dir("%s%s", g_gc_mount_path, ":/"))
     {
-        printf("failed to change path to gc\n");
+        write_log("failed to change path to gc\n");
         ui_display_error_box(ErrorCode_Mount_Chdir);
         fs_unmount_device(g_gc_mount_path);
         return false;
@@ -191,7 +192,7 @@ bool mount_gc(gamecard_t *gamecard)
     g_cnmt_total = get_dir_total_filter(".", "cnmt.nca");
     if (!g_cnmt_total)
     {
-        printf("no cnmt's found!? How on earth is that possible\n");
+        write_log("no cnmt's found!? How on earth is that possible\n");
         ui_display_error_box(ErrorCode_Mount_NoMeta);
         fs_unmount_device(g_gc_mount_path);
         return false;
@@ -199,7 +200,7 @@ bool mount_gc(gamecard_t *gamecard)
 
     if (!save_cnmt_path())
     {
-        printf("failed to save the paths of the cnmt's\n");
+        write_log("failed to save the paths of the cnmt's\n");
         ui_display_error_box(ErrorCode_Mount_Cnmt);
         fs_unmount_device(g_gc_mount_path);
         return false;
@@ -245,21 +246,21 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
 {
     if (!gamecard)
     {
-        printf("gamecard is null? failed to install\n");
+        write_log("gamecard is null? failed to install\n");
         ui_display_error_box(ErrorCode_Install_Null);
         return false;
     }
 
     if (storage_id != NcmStorageId_BuiltInUser && storage_id != NcmStorageId_SdCard)
     {
-        printf("got wrong storage id %u\n", storage_id);
+        write_log("got wrong storage id %u\n", storage_id);
         ui_display_error_box(ErrorCode_Install_Storage);
         return false;
     }
 
     if (ns_get_storage_free_space(storage_id) <= gamecard->size)
     {
-        printf("not enough free space.");
+        write_log("not enough free space.");
         ui_display_error_box(ErrorCode_Install_NoSpace);
         return false;
     }
@@ -267,7 +268,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
     NcmContentId content_id = nca_get_id_from_string(gamecard->cnmt_name);
     if (!nca_start_install(content_id, storage_id))
     {
-        printf("failed to install nca\n");
+        write_log("failed to install nca\n");
         ui_display_error_box(ErrorCode_Install_CnmtNca);
         return false;
     }
@@ -279,7 +280,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
 
     if (R_FAILED(cnmt_open(&cnmt)))
     {
-        printf("failed to install cnmt\n");
+        write_log("failed to install cnmt\n");
         ui_display_error_box(ErrorCode_Install_Cnmt);
         return false;
     }
@@ -288,7 +289,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
     {
         if (!nca_start_install(cnmt.cnmt_infos[i].content_id, storage_id))
         {
-            printf("failed to install nca\n");
+            write_log("failed to install nca\n");
             ui_display_error_box(ErrorCode_Install_Nca);
             free(cnmt.cnmt_infos);
             return false;

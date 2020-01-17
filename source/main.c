@@ -19,6 +19,7 @@
 
 #include "util/dir.h"
 #include "util/file.h"
+#include "util/log.h"
 
 
 #define APP_DIR     "sdmc:/switch/gamecard_installer"
@@ -31,11 +32,7 @@ void app_init()
 	SDL_EasyInit(SDL_WINDOW_SHOWN, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
 	#ifdef DEBUG
-	socketInitializeDefault();
-	nxlinkStdio();
-	printf("\ncan you see me?\n");
-	printf("if you can, that would be great\n");
-	printf("otherwise you won't see debug messages :(\n\n");
+	init_log();
 	#endif
 
 	init_ns();
@@ -51,7 +48,7 @@ void app_init()
 void app_exit()
 {
 	#ifdef DEBUG
-	socketExit();
+	exit_log();
 	#endif
 
 	exit_menu();

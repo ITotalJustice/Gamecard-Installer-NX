@@ -16,7 +16,7 @@ typedef enum
 
 
 //
-bool init_log(uint32_t flags);
+bool init_log(void);
 
 //
 void write_log(const char *text, ...);
