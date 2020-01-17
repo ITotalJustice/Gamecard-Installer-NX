@@ -18,7 +18,7 @@ typedef struct
     text_t *text_key_gen;
     text_t *text_size;
 
-    char cnmt_name[0x30];
+    char cnmt_name[0x100];
     uint64_t app_id;
     uint8_t key_gen;
     size_t size;

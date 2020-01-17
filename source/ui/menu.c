@@ -141,12 +141,16 @@ bool init_menu(void)
     // load icon from romfs.
     g_empty_icon = create_image_from_file(EMPTY_ICON_PATH, 90, 130, 0, 0);
     if (!g_empty_icon)
+    {
         return false;
+    }
 
     // load title text.
     g_title = create_text(&FONT_TEXT[QFontSize_25], 130, 40, Colour_Nintendo_White, TITLE_NAME);
     if (!g_title)
+    {
         return false;
+    }
 
     g_app_icon = create_button(&FONT_BUTTON[QFontSize_45], 65, 30, Colour_Nintendo_White, Font_Button_SETTINGS);
 
@@ -384,7 +388,7 @@ void ui_display_error_box(uint32_t err)
     }
 }
 
-void ui_display_progress_bar(const char *name, int speed, int eta_min, int eta_sec, size_t done, size_t remaining)
+void ui_display_progress_bar(const char *name, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining)
 {
     // display the popup box.
     ui_display_popup_box();

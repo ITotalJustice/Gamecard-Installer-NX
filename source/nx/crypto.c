@@ -9,12 +9,25 @@ uint8_t g_header_kek_src[0x10] = { 0x1F, 0x12, 0x91, 0x3A, 0x4A, 0xCB, 0xF0, 0x0
 uint8_t g_header_key_src[0x20] = { 0x5A, 0x3E, 0xD8, 0x4F, 0xDE, 0xC0, 0xD8, 0x26, 0x31, 0xF7, 0xE2, 0x5D, 0x19, 0x7B, 0xF5, 0xD0, 0x1C, 0x9B, 0x7B, 0xFA, 0xF6, 0x28, 0x18, 0x3D, 0x71, 0xF6, 0x4D, 0x73, 0xF1, 0x50, 0xB9, 0xD2 };
 
 
-void init_crypto(void)
+bool init_crypto(void)
 {
-    splCryptoInitialize();
-    splCryptoGenerateAesKek(g_header_kek_src, 0, 0, HEADER_KEK);
-    splCryptoGenerateAesKey(HEADER_KEK, g_header_key_src, HEADER_KEY_0);
-    splCryptoGenerateAesKey(HEADER_KEK, g_header_key_src + 0x10, HEADER_KEY_1);
+    if (R_FAILED(splCryptoInitialize()))
+    {
+        return false;
+    }
+    if (R_FAILED(splCryptoGenerateAesKek(g_header_kek_src, 0, 0, HEADER_KEK)))
+    {
+        return false;
+    }
+    if (R_FAILED(splCryptoGenerateAesKey(HEADER_KEK, g_header_key_src, HEADER_KEY_0)))
+    {
+        return false;
+    }
+    if (R_FAILED(splCryptoGenerateAesKey(HEADER_KEK, g_header_key_src + 0x10, HEADER_KEY_1)))
+    {
+        return false;
+    }
+    return true;
 }
 
 void exit_crypto(void)

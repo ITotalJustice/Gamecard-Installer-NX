@@ -2,11 +2,11 @@
 #define _FONT_H_
 
 
-#define FONT_MAX 15
-
+#include <stdbool.h>
 #include <SDL2/SDL_ttf.h>
 
 
+#define FONT_MAX 15
 typedef enum
 {
     QFontSize_15,
@@ -35,7 +35,7 @@ font_t FONT_TEXT[FONT_MAX];
 font_t FONT_BUTTON[FONT_MAX];
 
 //
-void init_font();
+bool init_font();
 
 //
 font_t create_font_file(const char *file, int font_size);

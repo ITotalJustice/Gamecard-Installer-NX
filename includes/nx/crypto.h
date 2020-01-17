@@ -18,7 +18,7 @@ uint8_t HEADER_KEY_1[0x10];
 
 
 //
-void init_crypto(void);
+bool init_crypto(void);
 
 //
 void exit_crypto(void);

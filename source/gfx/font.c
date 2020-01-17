@@ -1,8 +1,7 @@
-#include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <switch.h>
+
 #include "gfx/font.h"
-#include "gfx/button.h"
 
 
 font_t create_font_file(const char *file, int font_size)
@@ -24,15 +23,23 @@ void free_font(font_t *font)
     TTF_CloseFont(font->fnt);
 }
 
-void init_font()
+bool init_font()
 {
     if (R_FAILED(plInitialize()))
-        return;
+    {
+        return false;
+    }
 
-    PlFontData font;
-    PlFontData button;
-    plGetSharedFontByType(&font, PlSharedFontType_Standard);
-    plGetSharedFontByType(&button, PlSharedFontType_NintendoExt);
+    PlFontData font = {0};
+    PlFontData button = {0};
+    if (R_FAILED(plGetSharedFontByType(&font, PlSharedFontType_Standard)))
+    {
+        return false;
+    }
+    if (R_FAILED(plGetSharedFontByType(&button, PlSharedFontType_NintendoExt)))
+    {
+        return false;
+    }
 
     int font_sizes[] = { 15, 18, 20, 23, 25, 28, 30, 33, 35, 45, 48, 60, 63, 72, 170 };
 
@@ -41,6 +48,8 @@ void init_font()
         FONT_BUTTON[i] = create_font_mem(button.address, button.size, font_sizes[i]);
         FONT_TEXT[i] = create_font_mem(font.address, font.size, font_sizes[i]);
     }
+
+    return true;
 }
 
 void exit_font()

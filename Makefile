@@ -164,6 +164,7 @@ dist: all
 	@echo making dist ...
 
 	rm -rf out/
+	rm gamecard_installer.zip
 
 	mkdir -p out
 	mkdir -p out/switch

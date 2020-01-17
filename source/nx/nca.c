@@ -326,11 +326,11 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     thrd_create(&t_read, nca_read, &nca);
     thrd_create(&t_write, nca_write, &nca);
 
-    int prev_time = 0;
-    int prev_size = 0;
-    int speed = 0;
-    int eta_min = 0;
-    int eta_sec = 0;
+    uint8_t prev_time = 0;
+    uint64_t prev_size = 0;
+    uint64_t speed = 0;
+    uint32_t eta_min = 0;
+    uint8_t eta_sec = 0;
 
     while (nca.data_written != nca.total_size)
     {

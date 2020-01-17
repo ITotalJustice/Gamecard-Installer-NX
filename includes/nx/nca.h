@@ -28,7 +28,6 @@
 #define NCA_META_CNMT_OFFSET        0xC20
 
 
-
 typedef enum
 {
     NcaEncrpytMode_Decrypt,
@@ -213,7 +212,7 @@ int nca_read(void *in);
 int nca_write(void *in);
 
 //
-//bool nca_setup_placeholder(ncm_install_struct_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
+bool nca_setup_placeholder(ncm_install_struct_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
 
 //
 bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id);

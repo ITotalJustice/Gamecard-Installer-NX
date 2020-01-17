@@ -35,7 +35,7 @@ void ui_display_error_box(uint32_t err);
 bool ui_display_yes_no_box(const char *message);
 
 //
-void ui_display_progress_bar(const char *name, int speed, int eta_min, int eta_sec, size_t done, size_t remaining);
+void ui_display_progress_bar(const char *name, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining);
 
 //
 void render_menu(void);
