@@ -90,6 +90,30 @@ const char *nca_return_key_gen_string(uint8_t key_gen)
     }
 }
 
+uint16_t nca_return_key_gen_int(uint8_t key_gen)
+{
+    switch (key_gen)
+    {
+        // old key gen.
+        case NcaOldKeyGeneration_100: return 100;
+        case NcaOldKeyGeneration_300: return 300;
+
+        // new key gen.
+        case NcaKeyGeneration_301: return 301;
+        case NcaKeyGeneration_400: return 400;
+        case NcaKeyGeneration_500: return 500;
+        case NcaKeyGeneration_600: return 600;
+        case NcaKeyGeneration_620: return 620;
+        case NcaKeyGeneration_700: return 700;
+        case NcaKeyGeneration_810: return 810;
+        case NcaKeyGeneration_900: return 900;
+        case NcaKeyGeneration_910: return 910;
+
+        // unkown.
+        default: return 0;
+    }
+}
+
 void nca_encrypt_header(nca_header_t *header)
 {
     crypto_aes_xts(header, header, HEADER_KEY_0, HEADER_KEY_1, 0, NCA_SECTOR_SIZE, NCA_XTS_SECTION_SIZE, EncryptMode_Encrypt);

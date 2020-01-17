@@ -172,6 +172,12 @@ bool nca_check_if_magic_valid(uint32_t magic);
 const char *nca_return_key_gen_string(uint8_t key_gen);
 
 //
+uint16_t nca_return_key_gen_int(uint8_t key_gen);
+
+//
+bool nca_check_key_gen(uint8_t key_gen);
+
+//
 const char *nca_get_string_from_id(NcmContentId nca_id, char *out);
 
 //

@@ -25,7 +25,7 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     // get the app_id and setup data.
     uint64_t app_id = ncm_get_app_id_from_title_id(cnmt_key.id, cnmt_key.type);
     size_t data_size = sizeof(NcmContentMetaHeader) + ncm_cnmt_header.extended_header_size + (sizeof(NcmContentInfo) * ncm_cnmt_header.content_count);
-    uint8_t *data = malloc(data_size);
+    uint8_t *data = calloc(1, data_size);
 
     // offset of data, start at 0 (of course).
     uint64_t data_offset = 0;
@@ -36,14 +36,14 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     memcpy(&data[data_offset += ncm_cnmt_header.extended_header_size], cnmt_struct->cnmt_infos, ncm_cnmt_header.content_count * sizeof(NcmContentInfo));
 
     // set the database.
-    NcmContentMetaDatabase db;
+    NcmContentMetaDatabase db = {0};
     ncm_open_database(&db, cnmt_struct->storage_id);
     ncm_set_database(&db, &cnmt_key, data, data_size);
     ncm_commit_database(&db);
     ncm_close_database(&db);
     free(data);
 
-    uint8_t *app_record = malloc(sizeof(ContentStorageRecord));
+    uint8_t *app_record = calloc(1, sizeof(ContentStorageRecord));
     size_t app_record_size = 0;
 
     // check if any app_cnmt data exists, if so, add it to the start of the app_record buffer.
@@ -51,8 +51,7 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     if (cnmt_count)
     {
         app_record_size = cnmt_count * sizeof(ContentStorageRecord);
-        uint8_t *old_app_buf = malloc(app_record_size);
-        memset(old_app_buf, 0, app_record_size);
+        uint8_t *old_app_buf = calloc(1, app_record_size);
 
         ns_list_application_record_content_meta(0, app_id, old_app_buf, app_record_size, cnmt_count);
 
@@ -70,14 +69,14 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
 
 void *cnmt_set_ext_header(cnmt_struct_t *cnmt_struct, cnmt_header_t cnmt_header, uint64_t *offset)
 {
-    void *ext_data;
+    void *ext_data = {0};
 
     if (cnmt_header.meta_type == NcmContentMetaType_Application)
     {
         NcmApplicationMetaExtendedHeader ext_header;
         *offset += fs_read_file(&ext_header, sizeof(NcmApplicationMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
         ext_header.required_system_version = 0;
-        ext_data = malloc(sizeof(NcmApplicationMetaExtendedHeader));
+        ext_data = calloc(1, sizeof(NcmApplicationMetaExtendedHeader));
         memcpy(ext_data, &ext_header, sizeof(NcmApplicationMetaExtendedHeader));
     }
     else if (cnmt_header.meta_type == NcmContentMetaType_Patch)
@@ -85,12 +84,12 @@ void *cnmt_set_ext_header(cnmt_struct_t *cnmt_struct, cnmt_header_t cnmt_header,
         NcmPatchMetaExtendedHeader ext_header;
         *offset += fs_read_file(&ext_header, sizeof(NcmPatchMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
         ext_header.required_system_version = 0;
-        ext_data = malloc(sizeof(NcmPatchMetaExtendedHeader));
+        ext_data = calloc(1, sizeof(NcmPatchMetaExtendedHeader));
         memcpy(ext_data, &ext_header, sizeof(NcmPatchMetaExtendedHeader));
     }
     else
     {
-        ext_data = malloc(sizeof(NcmAddOnContentMetaExtendedHeader));
+        ext_data = calloc(1, sizeof(NcmAddOnContentMetaExtendedHeader));
         *offset += fs_read_file(ext_data, sizeof(NcmAddOnContentMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
     }
 
@@ -99,7 +98,7 @@ void *cnmt_set_ext_header(cnmt_struct_t *cnmt_struct, cnmt_header_t cnmt_header,
 
 void cnmt_read_data(cnmt_struct_t *cnmt_struct)
 {
-    cnmt_header_t cnmt_header;
+    cnmt_header_t cnmt_header = {0};
     uint64_t offset = 0;
 
     // main header.
@@ -109,8 +108,7 @@ void cnmt_read_data(cnmt_struct_t *cnmt_struct)
     void *ext_data = cnmt_set_ext_header(cnmt_struct, cnmt_header, &offset);
 
     // get all the ncaID's, add 1 for cnmt.
-    cnmt_struct->cnmt_infos = malloc((cnmt_header.content_count + 1) * sizeof(NcmContentInfo));
-    memset(cnmt_struct->cnmt_infos, 0, (cnmt_header.content_count + 1) * sizeof(NcmContentInfo));
+    cnmt_struct->cnmt_infos = calloc((cnmt_header.content_count + 1), sizeof(NcmContentInfo));
 
     // copy info of cnmt...
     memcpy(&cnmt_struct->cnmt_infos[0], &cnmt_struct->cnmt_info, sizeof(NcmContentInfo));
@@ -139,7 +137,7 @@ void cnmt_read_data(cnmt_struct_t *cnmt_struct)
 
 Result cnmt_open_cnmt_file(FsFileSystem *cnmt_system, FsDir *cnmt_dir, cnmt_struct_t *cnmt_struct)
 {
-    FsDirectoryEntry cnmt;
+    FsDirectoryEntry cnmt = {0};
     if (!fs_search_dir_for_file_2(cnmt_dir, &cnmt, "cnmt"))
         return 1;
     if (R_FAILED(fs_open_file(cnmt_system, FsOpenMode_Read, &cnmt_struct->cnmt_file, "/%s", cnmt.name)))
@@ -152,7 +150,7 @@ Result cnmt_open(cnmt_struct_t *cnmt_struct)
     Result rc = 0;
     NcmContentStorage cnmt_storage = {0};
     FsFileSystem cnmt_system = {0};
-    FsDir cnmt_dir;
+    FsDir cnmt_dir = {0};
 
     cnmt_struct->cnmt_info.content_type = NcmContentType_Meta;
     cnmt_struct->cnmt_info.id_offset = 0;

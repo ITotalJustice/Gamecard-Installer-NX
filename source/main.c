@@ -13,6 +13,7 @@
 #include "nx/ns.h"
 #include "nx/ncm.h"
 #include "nx/crypto.h"
+#include "nx/set.h"
 
 #include "ui/menu.h"
 #include "ui/gc.h"
@@ -37,6 +38,7 @@ void app_init()
 
 	init_ns();
 	init_ncm();
+	init_set();
 	init_crypto();
 	init_sound_default();
 	init_musicnx();
@@ -56,6 +58,7 @@ void app_exit()
 	exit_crypto();
 	exit_ns();
 	exit_ncm();
+	exit_set();
 	exit_font();
 	exit_musicnx();
 	exit_sound();

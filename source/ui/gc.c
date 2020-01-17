@@ -9,6 +9,7 @@
 #include "nx/nca.h"
 #include "nx/ncm.h"
 #include "nx/cnmt.h"
+#include "nx/set.h"
 
 #include "gfx/image.h"
 #include "gfx/text.h"
@@ -236,7 +237,7 @@ bool unmount_gc(gamecard_t *gamecard)
     fs_close_gamecard_handle(&g_gc_handle);
     fs_unmount_device(g_gc_mount_path);
     g_cnmt_total = 0;
-    memset(g_gc_mount_path, 0, 0x10);
+    memset(g_gc_mount_path, 0, sizeof(g_gc_mount_path));
     memset(gc_cnmt, 0, sizeof(gc_cnmt_t));
     reset_gc(gamecard);
     change_dir("sdmc:/");
@@ -259,9 +260,16 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
+    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen))
+    {
+        write_log("Too low of a fw version to install this game\n");
+        ui_display_error_box(ErrorCode_Install_KeyGen);
+        return false;
+    }
+
     if (ns_get_storage_free_space(storage_id) <= gamecard->size)
     {
-        write_log("not enough free space.");
+        write_log("not enough free space.\n");
         ui_display_error_box(ErrorCode_Install_NoSpace);
         return false;
     }
