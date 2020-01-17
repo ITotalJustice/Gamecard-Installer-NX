@@ -234,11 +234,12 @@ void reset_gc(gamecard_t *gamecard)
 bool unmount_gc(gamecard_t *gamecard)
 {
     fs_close_gamecard_handle(&g_gc_handle);
-    fs_umount_all_devices();
+    fs_unmount_device(g_gc_mount_path);
     g_cnmt_total = 0;
     memset(g_gc_mount_path, 0, 0x10);
     memset(gc_cnmt, 0, sizeof(gc_cnmt_t));
     reset_gc(gamecard);
+    change_dir("sdmc:/");
     return true;
 }
 
