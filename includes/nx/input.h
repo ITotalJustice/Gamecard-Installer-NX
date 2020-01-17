@@ -2,6 +2,7 @@
 #define _INPUT_H_
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <switch/services/hid.h>
 
 
@@ -18,6 +19,12 @@ typedef struct
 
 //
 input_t get_input(void);
+
+//
+bool check_if_touch_error(void);
+
+//
+int check_if_option(const input_t *input);
 
 //
 uint32_t move_cursor_up(uint32_t cursor, uint32_t cursor_max);

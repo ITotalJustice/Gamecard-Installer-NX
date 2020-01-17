@@ -334,8 +334,7 @@ void ui_display_error_box(uint32_t err)
     // loop until the user selects okay!
     while (appletMainLoop())
     {
-        input_t input = get_input();
-        if (input.down & KEY_A || input.down & KEY_B)
+        if (check_if_touch_error())
             break;
     }
 }
@@ -405,6 +404,16 @@ uint8_t handle_input(void)
 
     if (input.down & KEY_B)
         return Option_Exit;
+        
+    if (input.t_count)
+    {
+        int ret = check_if_option(&input);
+        if (ret != -1)
+        {
+            g_cursor = ret;
+            input.down |= KEY_A;
+        }
+    }
 
     if (input.down & KEY_A)
     {
