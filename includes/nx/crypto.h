@@ -24,6 +24,9 @@ bool init_crypto(void);
 void exit_crypto(void);
 
 //
+const uint8_t *return_keak_source(uint8_t crypto_type);
+
+//
 void *crypto_aes(const void *in, void *out, uint8_t *key, EncryptMode mode);
 
 //

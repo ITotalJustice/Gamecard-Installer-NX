@@ -15,6 +15,8 @@
 
 #define NCA_SECTOR_SIZE             0x200
 #define NCA_XTS_SECTION_SIZE        0xC00
+#define NCA_SECTION_TOTAL           0x4
+#define MEDIA_REAL(x)((x * 0x200))
 
 #define NCA0_MAGIC                  0x3041434E
 #define NCA2_MAGIC                  0x3241434E
@@ -119,7 +121,16 @@ typedef struct
         romfs_superblock_t romfs_sb;
         // anything else?????
     };
-    uint8_t bktr_not_finished[0x200]; // not finished. is optional?
+    union
+    {
+        uint8_t section_ctr[0x8];
+        struct
+        {
+            uint32_t section_ctr_low;
+            uint32_t section_ctr_high;
+        };
+    };
+    uint8_t _0x148[0xB8];       // empty.
 } nca_section_header_t;
 
 typedef struct
@@ -186,6 +197,9 @@ NcmContentId nca_get_id_from_string(const char *nca_in_string);
 /*
 *   nca header stuff.
 */
+
+//
+bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out);
 
 //
 void nca_encrypt_header(nca_header_t *header);

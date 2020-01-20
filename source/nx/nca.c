@@ -114,6 +114,39 @@ uint16_t nca_return_key_gen_int(uint8_t key_gen)
     }
 }
 
+bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out)
+{
+    if (!header || !out)
+    {
+        printf("NULL args in decrypt key area func\n");
+        return false;
+    }
+
+    uint8_t temp_kek[0x10] = {0};
+    if (R_FAILED(splCryptoGenerateAesKek(return_keak_source(header->kaek_index), 0, 0, temp_kek)))
+    {
+        printf("failed to generate aea kek\n");
+        return false;
+    }
+
+    nca_key_area_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
+    for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
+    {
+        if (R_FAILED(splCryptoGenerateAesKey(temp_kek, &header->key_area[i], &decrypted_nca_keys[i])))
+        {
+            printf("failed to aes key %i\n", i);
+            return false;
+        }
+    }
+
+    if (!memcpy(out, &decrypted_nca_keys[0x2], sizeof(nca_key_area_t)))
+    {
+        printf("failed to copy decrypted key into out\n");
+        return false;
+    }
+    return true;
+}
+
 void nca_encrypt_header(nca_header_t *header)
 {
     crypto_aes_xts(header, header, HEADER_KEY_0, HEADER_KEY_1, 0, NCA_SECTOR_SIZE, NCA_XTS_SECTION_SIZE, EncryptMode_Encrypt);
