@@ -105,15 +105,12 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
             gamecard->app_id = ncm_get_app_id_from_title_id(header.title_id, NcmContentMetaType_Application);
 
             NsApplicationControlData control_data = {0};
-            NacpLanguageEntry *lang = {0};
-
             ns_get_app_control_data(&control_data, gamecard->app_id);
-            nacpGetLanguageEntry(&control_data.nacp, &lang);
 
             strcpy(gamecard->cnmt_name, d->d_name);
             gamecard->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
-            gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, lang->name);
-            gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, lang->author);
+            gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
+            gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
             gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
             gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(header.key_gen ? header.key_gen : header.old_key_gen));
         }
