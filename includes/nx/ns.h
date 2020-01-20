@@ -59,7 +59,6 @@ uint32_t ns_count_application_record(uint64_t app_id);
 //
 Result ns_delete_application_completely(uint64_t app_id);
 
-
 // push an application record.
 Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, size_t data_size);
 

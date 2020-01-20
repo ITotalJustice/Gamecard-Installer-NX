@@ -10,6 +10,7 @@ typedef struct
 {
     NcmContentMetaKey metaRecord;
     uint8_t storage_id;
+    uint8_t padding[0x7];
 } ContentStorageRecord;
 
 typedef struct

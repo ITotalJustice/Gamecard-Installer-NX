@@ -51,7 +51,7 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     if (cnmt_count)
     {
         app_record_size = cnmt_count * sizeof(ContentStorageRecord);
-        uint8_t *old_app_buf = calloc(1, app_record_size);
+        ContentStorageRecord *old_app_buf = calloc(1, app_record_size);
 
         ns_list_application_record_content_meta(0, app_id, old_app_buf, app_record_size, cnmt_count);
 
@@ -63,37 +63,34 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     // push record.
     memcpy(&app_record[app_record_size], &cnmt_storage_record, sizeof(ContentStorageRecord));
     ns_delete_application_record(app_id);
-    ns_push_application_record(app_id, (ContentStorageRecord *)app_record, app_record_size + sizeof(ContentStorageRecord));
+    ns_push_application_record(app_id, app_record, (cnmt_count + 1) * sizeof(ContentStorageRecord));
     free(app_record);
 }
 
 void *cnmt_set_ext_header(cnmt_struct_t *cnmt_struct, cnmt_header_t cnmt_header, uint64_t *offset)
 {
-    void *ext_data = {0};
-
     if (cnmt_header.meta_type == NcmContentMetaType_Application)
     {
-        NcmApplicationMetaExtendedHeader ext_header;
-        *offset += fs_read_file(&ext_header, sizeof(NcmApplicationMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
-        ext_header.required_system_version = 0;
-        ext_data = calloc(1, sizeof(NcmApplicationMetaExtendedHeader));
-        memcpy(ext_data, &ext_header, sizeof(NcmApplicationMetaExtendedHeader));
+        NcmApplicationMetaExtendedHeader *ext_header = calloc(1, sizeof(NcmApplicationMetaExtendedHeader));
+        *offset += fs_read_file(ext_header, sizeof(NcmApplicationMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
+        ext_header->required_system_version = 0;
+        ext_header->required_application_version = 0;
+        return ext_header;
     }
     else if (cnmt_header.meta_type == NcmContentMetaType_Patch)
     {
-        NcmPatchMetaExtendedHeader ext_header;
-        *offset += fs_read_file(&ext_header, sizeof(NcmPatchMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
-        ext_header.required_system_version = 0;
-        ext_data = calloc(1, sizeof(NcmPatchMetaExtendedHeader));
-        memcpy(ext_data, &ext_header, sizeof(NcmPatchMetaExtendedHeader));
+        NcmPatchMetaExtendedHeader *ext_header = calloc(1, sizeof(NcmPatchMetaExtendedHeader));
+        *offset += fs_read_file(ext_header, sizeof(NcmPatchMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
+        ext_header->required_system_version = 0;
+        return ext_header;
     }
     else
     {
-        ext_data = calloc(1, sizeof(NcmAddOnContentMetaExtendedHeader));
-        *offset += fs_read_file(ext_data, sizeof(NcmAddOnContentMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
+        NcmAddOnContentMetaExtendedHeader *ext_header = calloc(1, sizeof(NcmAddOnContentMetaExtendedHeader));
+        *offset += fs_read_file(ext_header, sizeof(NcmAddOnContentMetaExtendedHeader), *offset, FsReadOption_None, &cnmt_struct->cnmt_file);
+        ext_header->required_application_version = 0;
+        return ext_header;
     }
-
-    return ext_data;
 }
 
 void cnmt_read_data(cnmt_struct_t *cnmt_struct)
@@ -116,7 +113,7 @@ void cnmt_read_data(cnmt_struct_t *cnmt_struct)
 
     for (uint32_t i = 0; i < cnmt_header.content_count; i++)
     {
-        NcmPackagedContentInfo packed_temp;
+        NcmPackagedContentInfo packed_temp = {0};
         offset += fs_read_file(&packed_temp, sizeof(NcmPackagedContentInfo), offset, FsReadOption_None, &cnmt_struct->cnmt_file);
 
         // skip deltas...
