@@ -271,11 +271,17 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
+    if (R_FAILED(appletSetMediaPlaybackState(true)))
+    {
+        write_log("couldnt set media playback state\n");
+    }
+
     NcmContentId content_id = nca_get_id_from_string(gamecard->cnmt_name);
     if (!nca_start_install(content_id, storage_id))
     {
         write_log("failed to install nca\n");
         ui_display_error_box(ErrorCode_Install_CnmtNca);
+        appletSetMediaPlaybackState(false);
         return false;
     }
 
@@ -288,6 +294,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
     {
         write_log("failed to install cnmt\n");
         ui_display_error_box(ErrorCode_Install_Cnmt);
+        appletSetMediaPlaybackState(false);
         return false;
     }
 
@@ -298,10 +305,12 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
             write_log("failed to install nca\n");
             ui_display_error_box(ErrorCode_Install_Nca);
             free(cnmt.cnmt_infos);
+            appletSetMediaPlaybackState(false);
             return false;
         }
     }
     
     free(cnmt.cnmt_infos);
+    appletSetMediaPlaybackState(false);
     return true;
 }

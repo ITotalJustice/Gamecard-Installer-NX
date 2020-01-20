@@ -17,7 +17,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-#include "gfx/sdl_easy.h"
+#include "gfx/SDL_easy.h"
 
 
 static SDL_Window   *main_window;
