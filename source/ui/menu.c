@@ -453,7 +453,7 @@ uint8_t handle_input(void)
 
     if (input.down & KEY_B)
     {
-        if (ui_display_yes_no_box("would you like to exit?"))
+        if (ui_display_yes_no_box("Would you like to exit?"))
             return Option_Exit;  
     }
 
