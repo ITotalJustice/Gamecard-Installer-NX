@@ -19,5 +19,5 @@ uint16_t get_sys_fw_version(void)
 {
     SetSysFirmwareVersion fw_ver = {0};
     setsysGetFirmwareVersion(&fw_ver);
-    return (fw_ver.major * 100) + (fw_ver.micro * 10) + (fw_ver.minor);
+    return (fw_ver.major * 100) + (fw_ver.minor * 10) + (fw_ver.micro);
 }
