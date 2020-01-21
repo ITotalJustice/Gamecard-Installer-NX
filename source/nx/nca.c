@@ -192,7 +192,9 @@ int nca_read(void *in)
     if (!t)
         return -1;
 
-    void *buf = malloc(0x800000);
+    void *buf = calloc(1, 0x800000);
+    if (!buf)
+        return -1;
 
     for (uint64_t done = NCA_XTS_SECTION_SIZE, bufsize = 0x800000; done < t->total_size; done += bufsize)
     {
@@ -222,7 +224,7 @@ int nca_write(void *in)
 {
     thread_t *t = (thread_t *)in;
     if (!t)
-        return 1;
+        return -1;
 
     while (t->data_written < t->total_size)
     {
@@ -335,6 +337,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
         write_log("failed to setup placeholder\n");
         fclose(nca.fp);
         free(header);
+        ncm_delete_placeholder(&nca.ncm.storage, &nca.ncm.placeholder_id);
         ncm_close_storage(&nca.ncm.storage);
         return false;
     }
@@ -347,6 +350,11 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
 
     // allocate memory that will be shared between the read and write threads. (memory is protected).
     nca.data = calloc(1, 0x800000);
+    if (!nca.data)
+    {
+        fclose(nca.fp);
+        return false;
+    }
 
     // setup the 2 worker threads.
     mtx_init(&nca_mtx, mtx_plain);
@@ -365,6 +373,10 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     uint32_t eta_min = 0;
     uint8_t eta_sec = 0;
 
+    // init the progress bar.
+    progress_bar_t *p_bar = ui_init_progress_bar(nca_string, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
+    
+    // loop until file has finished installing.
     while (nca.data_written != nca.total_size)
     {
         time_t uinx_time = time(NULL);
@@ -378,35 +390,53 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
             eta_min = ((nca.total_size - size) / speed) / 60;
             eta_sec = ((nca.total_size - size) / speed) % 60;
             prev_size = size;
+            ui_update_progress_bar(p_bar, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
         }
-
         update_button_spin();
-        ui_display_progress_bar(nca_string, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
+        ui_display_progress_bar(p_bar);
     }
+    ui_free_progress_bar(p_bar);
 
-    thrd_join(t_read, NULL);
-    thrd_join(t_write, NULL);
+    int ret_read = 0;
+    int ret_write = 0;
+    thrd_join(t_read, &ret_read);
+    thrd_join(t_write, &ret_write);
     mtx_destroy(&nca_mtx);
     cnd_destroy(&can_read);
     cnd_destroy(&can_write);
-
     free(nca.data);
+    fclose(nca.fp);
 
-    if (ncm_check_if_nca_exists(&nca.ncm.storage, &nca.ncm.content_id))
+    // check if the threads were unsuccesful.
+    if (ret_read == -1 || ret_write == -1)
     {
-        ncm_delete_nca(&nca.ncm.storage, &nca.ncm.content_id);
+        write_log("threading error read: %d write: %d\n", ret_read, ret_write);
+        ncm_delete_placeholder(&nca.ncm.storage, &nca.ncm.placeholder_id);
+        ncm_close_storage(&nca.ncm.storage);
+        return false;
     }
 
+    // check if the ncas exists, if so, delete it.
+    if (ncm_check_if_nca_exists(&nca.ncm.storage, &nca.ncm.content_id))
+    {
+        if (R_FAILED(ncm_delete_nca(&nca.ncm.storage, &nca.ncm.content_id)))
+        {
+            write_log("failed to delete nca\n");
+            ncm_delete_placeholder(&nca.ncm.storage, &nca.ncm.placeholder_id);
+            ncm_close_storage(&nca.ncm.storage);
+            return false;
+        }
+    }
+
+    // register the placeholder.
     if (R_FAILED(ncm_register_placeholder(&nca.ncm.storage, &nca.ncm.content_id, &nca.ncm.placeholder_id)))
     {
         write_log("failed to register placeholder\n");
+        ncm_delete_placeholder(&nca.ncm.storage, &nca.ncm.placeholder_id);
         ncm_close_storage(&nca.ncm.storage);
-        fclose(nca.fp);
         return false;
     }
 
     ncm_close_storage(&nca.ncm.storage);
-    fclose(nca.fp);
-
     return true;
 }

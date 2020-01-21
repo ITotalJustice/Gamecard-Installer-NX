@@ -26,56 +26,56 @@ static SDL_Renderer *main_renderer;
 
 SDL_Colour colours[] =
 {
-    { 255, 255, 255 },          //white
-    { 140, 140, 140, 255 },     //grey
-    { 81, 81, 81 },             //dark grey
-    { 0, 0, 0 },                //black
-    { 255, 192, 203 },          //pink
-    { 253, 52, 131, 1 },        //neon pink
-    { 255, 105, 180 },          //hotpink
-    { 255, 165, 0 },            //orange
-    { 255, 255, 0 },            //yellow
-    { 255, 215, 0 },            //gold
-    { 139, 69, 19 },            //brown
-    { 255, 0, 0 },              //red
-    { 139, 0, 0 },              //dark red
-    { 0, 128, 0 },              //green
-    { 50, 205, 50 },            //lime green
-    { 0, 255, 255 },            //aqua
-    { 0, 128, 128 },            //teal
-    { 0, 191, 255 },            //light blue
-    { 0, 0, 255 },              //blue
-    { 131, 177, 218 },          //jordy blue
-    { 97, 115, 255 },           //faint blue
-    { 28, 33, 73 },             //dark blue
-    { 160, 32, 240 },           //purple
-    { 75, 0, 130 },             //indigo
-    { 245, 245, 220 },          //beige
-    { 45, 45, 45 },             //n_black
-    { 50, 50, 50 },             //n_light_black
-    { 114, 114, 114 },          //n_light_silver
-    { 128, 128, 128 },          //n_silver
-    { 178, 178, 178 },          //n_bright_Silver
-    { 70, 70, 70 },             //n_dark_grey
-    { 77, 77, 77 },             //n_grey
-    { 251, 251, 251 },          //n_white
-    { 0, 255, 200 },            //n_cyan
-    { 143, 253, 252 },          //n_teal
-    { 36, 141, 199 },           //n_blue
-    { 27, 161, 255 },           //n_lightblue
-    { 255, 177, 66 },           //n_yellow
-    { 250, 90, 58 },            //n_red
-    { 207, 36, 33 },            //glacia_red
-    { 41, 30, 125 },            //glacia_blue
-    { 99, 32, 160 },            //glacia_purple
-    { 242, 0, 32 },             //tomi_red
-    { 40, 48, 76 },             //law_blue
-    { 136, 49, 57 },            //law_red
-    { 37, 103, 75 },            //law_green
-    { 4, 38, 37 },              //law_darkgreen
-    { 28, 23, 62 },             //law_purple
-    { 117, 3, 65 },             //law_fuchsia
-    { 171, 61, 12 },            //law_orange
+    { 255, 255, 255, 255 },         //white
+    { 140, 140, 140, 255 },         //grey
+    { 81, 81, 81, 255 },            //dark grey
+    { 0, 0, 0, 255 },               //black
+    { 255, 192, 203, 255 },         //pink
+    { 253, 52, 131, 1 },            //neon pink
+    { 255, 105, 180, 255 },         //hotpink
+    { 255, 165, 0, 255 },           //orange
+    { 255, 255, 0, 255 },           //yellow
+    { 255, 215, 0, 255 },           //gold
+    { 139, 69, 19, 255 },           //brown
+    { 255, 0, 0, 255 },             //red
+    { 139, 0, 0, 255 },             //dark red
+    { 0, 128, 0, 255 },             //green
+    { 50, 205, 50, 255 },           //lime green
+    { 0, 255, 255, 255 },           //aqua
+    { 0, 128, 128, 255 },           //teal
+    { 0, 191, 255, 255 },           //light blue
+    { 0, 0, 255, 255 },             //blue
+    { 131, 177, 218, 255 },         //jordy blue
+    { 97, 115, 255, 255 },          //faint blue
+    { 28, 33, 73, 255 },            //dark blue
+    { 160, 32, 240, 255 },          //purple
+    { 75, 0, 130, 255 },            //indigo
+    { 245, 245, 220, 255 },         //beige
+    { 45, 45, 45, 255 },            //n_black
+    { 50, 50, 50, 255 },            //n_light_black
+    { 114, 114, 114, 255 },         //n_light_silver
+    { 128, 128, 128, 255 },         //n_silver
+    { 178, 178, 178, 255 },         //n_bright_Silver
+    { 70, 70, 70, 255 },            //n_dark_grey
+    { 77, 77, 77, 255 },            //n_grey
+    { 251, 251, 251, 255 },         //n_white
+    { 0, 255, 200, 255 },           //n_cyan
+    { 143, 253, 252, 255 },         //n_teal
+    { 36, 141, 199, 255 },          //n_blue
+    { 27, 161, 255, 255 },          //n_lightblue
+    { 255, 177, 66, 255 },          //n_yellow
+    { 250, 90, 58, 255 },           //n_red
+    { 207, 36, 33, 255 },           //glacia_red
+    { 41, 30, 125, 255 },           //glacia_blue
+    { 99, 32, 160, 255 },           //glacia_purple
+    { 242, 0, 32, 255 },            //tomi_red
+    { 40, 48, 76, 255 },            //law_blue
+    { 136, 49, 57, 255 },           //law_red
+    { 37, 103, 75, 255 },           //law_green
+    { 4, 38, 37, 255 },             //law_darkgreen
+    { 28, 23, 62, 255 },            //law_purple
+    { 117, 3, 65, 255 },            //law_fuchsia
+    { 171, 61, 12, 255 },           //law_orange
 };
 
 
@@ -118,7 +118,7 @@ void SDL_DrawText(TTF_Font *font, int x, int y, Colour colour, const char *text,
     SDL_Colour col = SDL_GetColour(colour);
     SDL_Surface *surface = TTF_RenderUTF8_Blended(font, full_text, col);
     SDL_Texture *tex = SDL_CreateTextureFromSurface(main_renderer, surface);
-    SDL_Rect pos = { pos.x = x, pos.y = y, pos.w = surface ->w, pos.h = surface->h };
+    SDL_Rect pos = { pos.x = x, pos.y = y, pos.w = surface->w, pos.h = surface->h };
     SDL_FreeSurface(surface);
     SDL_RenderCopy(main_renderer, tex, NULL, &pos);
     SDL_DestroyTexture(tex);
@@ -144,7 +144,7 @@ void SDL_DrawButton(TTF_Font *font, uint16_t btn, int x, int y, Colour colour)
     SDL_Colour col = SDL_GetColour(colour);
     SDL_Surface *surface = TTF_RenderGlyph_Blended(font, btn, col);
     SDL_Texture *tex = SDL_CreateTextureFromSurface(main_renderer, surface);
-    SDL_Rect pos = { pos.x = x, pos.y = y, pos.w = surface ->w, pos.h = surface->h };
+    SDL_Rect pos = { pos.x = x, pos.y = y, pos.w = surface->w, pos.h = surface->h };
 
     SDL_FreeSurface(surface);
     SDL_RenderCopy(main_renderer, tex, NULL, &pos);
@@ -190,6 +190,13 @@ void SDL_DrawShape(Colour colour, int x, int y, int w, int h, bool filled)
     filled ? SDL_RenderFillRect(main_renderer, &pos) : SDL_RenderDrawRect(main_renderer, &pos);
 }
 
+void SDL_DrawShapeEX(uint8_t r, uint8_t g, uint8_t b, uint8_t a, int x, int y, int w, int h, bool filled)
+{
+    SDL_Rect pos = { pos.x = x, pos.y = y, pos.w = w, pos.h = h };
+    SDL_SetRenderDrawColor(main_renderer, r, g, b, a);
+    filled ? SDL_RenderFillRect(main_renderer, &pos) : SDL_RenderDrawRect(main_renderer, &pos);
+}
+
 void SDL_DrawShapeOutline(Colour colour, int x, int y, int w, int h, int thicc)
 {
     // top, right, bottom, left.
@@ -197,6 +204,15 @@ void SDL_DrawShapeOutline(Colour colour, int x, int y, int w, int h, int thicc)
     SDL_DrawShape(colour, x + w, y, thicc, h + thicc, true);
     SDL_DrawShape(colour, x, y + h, w, thicc, true);
     SDL_DrawShape(colour, x, y, thicc, h + thicc, true);
+}
+
+void SDL_DrawShapeOutlineEX(uint8_t r, uint8_t g, uint8_t b, uint8_t a, int x, int y, int w, int h, int thicc)
+{
+    // top, right, bottom, left.
+    SDL_DrawShapeEX(r, g, b, a, x, y, w, thicc, true);
+    SDL_DrawShapeEX(r, g, b, a, x + w, y, thicc, h + thicc, true);
+    SDL_DrawShapeEX(r, g, b, a, x, y + h, w, thicc, true);
+    SDL_DrawShapeEX(r, g, b, a, x, y, thicc, h + thicc, true);
 }
 
 void SDL_DrawShapeRounded(Colour colour, int x, int y, int w, int h, int r)
@@ -274,6 +290,13 @@ void SDL_GetTextSize(TTF_Font *font, int *w, int *h, const char *text, ...)
     TTF_SizeUTF8(font, full_text, w, h);
 }
 
+void SDL_SetTextureColour(SDL_Texture *texture, Colour colour)
+{
+    if (!texture) return;
+    SDL_Colour col = SDL_GetColour(colour);
+    SDL_SetTextureColorMod(texture, col.r, col.g, col.b);
+}
+
 void SDL_ClearRenderer(void)
 {
     SDL_SetRenderDrawColor(main_renderer, 0xff, 0xff, 0xff, 0xff);
@@ -293,6 +316,7 @@ void SDL_EasyInit(Window_Flags w_flags, Renderer_Flags r_flags)
 
     main_window = SDL_CreateWindow("totaljustice", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_W, SCREEN_H, w_flags);
     main_renderer = SDL_CreateRenderer(main_window, -1, r_flags);
+    SDL_SetRenderDrawBlendMode(SDL_GetRenderer(SDL_GetWindow()), SDL_BLENDMODE_BLEND);
 }
 
 void SDL_EasyExit(void)
