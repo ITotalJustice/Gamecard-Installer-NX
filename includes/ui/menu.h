@@ -46,6 +46,12 @@ bool init_menu(void);
 void exit_menu(void);
 
 //
+bool is_lower_key_gen_enabled(void);
+
+//
+bool is_bl_enabled(void);
+
+//
 void update_button_spin(void);
 
 //

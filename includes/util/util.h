@@ -41,4 +41,7 @@ size_t debug_dump_info(const void *buf, size_t buf_size, const char *path, const
 //
 void *mem_alloc(size_t size);
 
+//
+void str2hex(uint8_t *out, const char *str);
+
 #endif

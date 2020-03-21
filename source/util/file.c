@@ -21,6 +21,11 @@ FILE *open_file2(const char *mode, const char *file, ...)
     return fopen(full_path, mode);
 }
 
+FILE *open_temp_file(const char *mode)
+{
+    return fopen("sdmc:/temp", mode);
+}
+
 bool create_file(const char *file)
 {
     if (check_if_file_exists(file))
@@ -55,7 +60,7 @@ bool check_file_ext(const char *file_name, const char *ext)
 size_t get_file_size(const char *file)
 {
     size_t size = 0;
-    FILE *f = open_file2(file, "r");
+    FILE *f = open_file2("r", file);
     if (!f)
         return size;
     
@@ -65,25 +70,46 @@ size_t get_file_size(const char *file)
     return size;
 }
 
+size_t get_file_size2(FILE *fp)
+{
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    rewind(fp);
+    return size;
+}
+
 bool delete_file(const char *file)
 {
     return remove(file) == 0 ? true : false;
 }
 
+bool delete_temp_file(void)
+{
+    return remove("sdmc:/temp") == 0 ? true : false;
+}
+
 void copy_file(const char *src, char *dest)
 {
     FILE *srcfile = fopen(src, "rb");
-    FILE *newfile = fopen(dest, "wb");
-
-    if (srcfile && newfile)
+    if (!srcfile)
     {
-        void *buf = malloc(0x800000);
-        size_t bytes; // size of the file to write (8MiB or filesize max)
-
-        while (0 < (bytes = fread(buf, 1, 0x800000, srcfile)))
-            fwrite(buf, bytes, 1, newfile);
-        free(buf);
+        return;
     }
+
+    FILE *newfile = fopen(dest, "wb");
+    if (!newfile)
+    {
+        fclose(srcfile);
+        return;
+    }
+    
+    void *buf = malloc(0x800000);
+    size_t bytes; // size of the file to write (8MiB or filesize max)
+
+    while (0 < (bytes = fread(buf, 1, 0x800000, srcfile)))
+        fwrite(buf, bytes, 1, newfile);
+    free(buf);
+    
     fclose(srcfile);
     fclose(newfile);
 }

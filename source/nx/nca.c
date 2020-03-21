@@ -16,6 +16,9 @@
 #include "util/log.h"
 
 
+#define BUFFER_SIZE 0x800000
+
+
 mtx_t nca_mtx = {0};
 cnd_t can_read = {0};
 cnd_t can_write = {0};
@@ -25,6 +28,7 @@ typedef struct
     FILE *fp;
     void *data;
     size_t data_size;
+    size_t data_read;
     size_t data_written;
     size_t total_size;
     ncm_install_struct_t ncm;
@@ -114,39 +118,6 @@ uint16_t nca_return_key_gen_int(uint8_t key_gen)
     }
 }
 
-bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out)
-{
-    if (!header || !out)
-    {
-        printf("NULL args in decrypt key area func\n");
-        return false;
-    }
-
-    uint8_t temp_kek[0x10] = {0};
-    if (R_FAILED(splCryptoGenerateAesKek(return_keak_source(header->kaek_index), 0, 0, temp_kek)))
-    {
-        printf("failed to generate aea kek\n");
-        return false;
-    }
-
-    nca_key_area_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
-    for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
-    {
-        if (R_FAILED(splCryptoGenerateAesKey(temp_kek, &header->key_area[i], &decrypted_nca_keys[i])))
-        {
-            printf("failed to aes key %i\n", i);
-            return false;
-        }
-    }
-
-    if (!memcpy(out, &decrypted_nca_keys[0x2], sizeof(nca_key_area_t)))
-    {
-        printf("failed to copy decrypted key into out\n");
-        return false;
-    }
-    return true;
-}
-
 void nca_encrypt_header(nca_header_t *header)
 {
     crypto_aes_xts(header, header, HEADER_KEY_0, HEADER_KEY_1, 0, NCA_SECTOR_SIZE, NCA_XTS_SECTION_SIZE, EncryptMode_Encrypt);
@@ -192,11 +163,11 @@ int nca_read(void *in)
     if (!t)
         return -1;
 
-    void *buf = calloc(1, 0x800000);
+    void *buf = calloc(1, BUFFER_SIZE);
     if (!buf)
         return -1;
 
-    for (uint64_t done = NCA_XTS_SECTION_SIZE, bufsize = 0x800000; done < t->total_size; done += bufsize)
+    for (uint64_t done = t->data_written, bufsize = BUFFER_SIZE; appletMainLoop() && done < t->total_size; done += bufsize)
     {
         if (done + bufsize > t->total_size)
             bufsize = t->total_size - done;
@@ -226,7 +197,7 @@ int nca_write(void *in)
     if (!t)
         return -1;
 
-    while (t->data_written < t->total_size)
+    while (appletMainLoop() && t->data_written < t->total_size)
     {
         mtx_lock(&nca_mtx);
         if (t->data_size == 0)
@@ -272,28 +243,94 @@ bool nca_setup_placeholder(ncm_install_struct_t *out, size_t size, NcmContentId 
     return true;
 }
 
+FILE *nca_try_open_file(NcmContentId content_id, char *out_string, const char *mode)
+{
+    FILE *fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".nca");
+    if (!fp)
+    {
+        fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".cnmt.nca");
+        if (!fp)
+        {
+            fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".ncz");
+            if (!fp)
+            {
+                return NULL;
+            }
+        }
+    }
+    return fp;
+}
+
+bool nca_decrypt_keak(nca_header_t *header, nca_key_area_t *out)
+{
+    if (!header || !out)
+    {
+        write_log("NULL args in decrypt key area func\n");
+        return false;
+    }
+   
+    // decrypt to get the key.
+    nca_key_area_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
+    Aes128Context ctx_dec = {0};
+
+    // sort out the key gen.
+    uint8_t key_gen = header->key_gen ? header->key_gen : header->old_key_gen;
+    if (key_gen) key_gen--;
+
+    const uint8_t *keak = get_keak(key_gen);
+    if (!keak) return false;
+
+    aes128ContextCreate(&ctx_dec, keak, false);
+    for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
+    {
+        aes128DecryptBlock(&ctx_dec, &decrypted_nca_keys[i], &header->key_area[i]);
+    }
+
+    // copy decrypted key.
+    memcpy(out, &decrypted_nca_keys[0x2], sizeof(nca_key_area_t));
+    return true;
+}
+
+bool nca_encrypt_keak(nca_header_t *header, const nca_key_area_t *decrypted_key, uint8_t key_gen)
+{
+    if (!header || !decrypted_key || !has_key_gen(key_gen))
+    {
+        write_log("NULL args in encrypt key area func\n");
+        return false;
+    }
+
+    Aes128Context ctx = {0};
+    nca_key_area_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
+    memcpy(&decrypted_nca_keys[0x2], decrypted_key, sizeof(nca_key_area_t));
+
+    const uint8_t *keak = get_keak(key_gen);
+    if (!keak) return false;
+
+    aes128ContextCreate(&ctx, keak, true);
+    for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
+    {
+        aes128EncryptBlock(&ctx, &header->key_area[i], &decrypted_nca_keys[i]);
+    }
+
+    header->key_gen = key_gen;
+    header->old_key_gen = key_gen;
+
+    return true;
+}
+
+#include "nx/input.h"
 bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
 {
     // this will be the thread that is passed to the read / write.
-    // it will also hold the file pointer.
     thread_t nca = {0};
 
     // first open the nca file to install.
     char nca_string[0x21] = {0};
-
-    nca.fp = open_file2("rb", "%s%s", nca_get_string_from_id(content_id, nca_string), ".nca");
+    nca.fp = nca_try_open_file(content_id, nca_string, "rb");
     if (!nca.fp)
     {
-        nca.fp = open_file2("rb", "%s%s", nca_get_string_from_id(content_id, nca_string), ".cnmt.nca");
-        if (!nca.fp)
-        {
-            nca.fp = open_file2("rb", "%s%s", nca_get_string_from_id(content_id, nca_string), ".ncz");
-            if (!nca.fp)
-            {
-                write_log("failed to open nca file... %s\n", nca_string);
-                return false;
-            }
-        }
+        write_log("failed to open nca file... %s\n", nca_string);
+        return false;
     }
 
     // next we need to get the header.
@@ -313,6 +350,13 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
         return false;
     }
 
+    nca_key_area_t keak = {0};
+    if (is_lower_key_gen_enabled())
+    {
+        nca_decrypt_keak(header, &keak);
+        nca_encrypt_keak(header, &keak, 0);
+    }
+    
     // now that we have the actual size of the nca, we can setup the placeholder.
     if (!nca_setup_placeholder(&nca.ncm, header->size, &content_id, storage_id))
     {
@@ -349,7 +393,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     free(header);
 
     // allocate memory that will be shared between the read and write threads. (memory is protected).
-    nca.data = calloc(1, 0x800000);
+    nca.data = calloc(1, BUFFER_SIZE);
     if (!nca.data)
     {
         fclose(nca.fp);
@@ -361,12 +405,15 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
     cnd_init(&can_read);
     cnd_init(&can_write);
 
-    thrd_t t_read;
-    thrd_t t_write;
+    thrd_t t_read = {0};
+    thrd_t t_write = {0};
 
     thrd_create(&t_read, nca_read, &nca);
     thrd_create(&t_write, nca_write, &nca);
 
+    // TODO: make this into a struct
+    // also dont do ui stuff in nca
+    // instead, just have a state system for the ui, then do a callback in nca with the progress.
     uint8_t prev_time = 0;
     uint64_t prev_size = 0;
     uint64_t speed = 0;
@@ -375,9 +422,9 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
 
     // init the progress bar.
     progress_bar_t *p_bar = ui_init_progress_bar(nca_string, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
-    
+
     // loop until file has finished installing.
-    while (nca.data_written != nca.total_size)
+    while (appletMainLoop() && nca.data_written != nca.total_size)
     {
         time_t uinx_time = time(NULL);
         struct tm* time_struct = gmtime(&uinx_time);
@@ -394,6 +441,13 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
         }
         update_button_spin();
         ui_display_progress_bar(p_bar);
+        thrd_yield();
+    }
+    if (!appletMainLoop())
+    {
+        cnd_signal(&can_read);
+        cnd_signal(&can_write);
+        mtx_unlock(&nca_mtx);
     }
     ui_free_progress_bar(p_bar);
 
@@ -436,7 +490,7 @@ bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id)
         ncm_close_storage(&nca.ncm.storage);
         return false;
     }
-
+    
     ncm_close_storage(&nca.ncm.storage);
     return true;
 }

@@ -192,9 +192,10 @@ void copy_dir(const char *src, char *dest)
     if (!dir)
         return;
 
+    char buffer[0x200] = {0};
+
     while ((de = readdir(dir)))
     {
-        char buffer[512];
         snprintf(buffer, sizeof(buffer), "%s/%s", dest, de->d_name);
 
         // check if the file is a directory.

@@ -102,6 +102,24 @@ typedef enum
 
 typedef struct
 {
+    bool lower_key_gen;
+
+    struct
+    {
+        bool title;
+        char title_text[0x200];
+        bool author;
+        char author_text[0x100];
+
+        bool screenshot;
+        bool video_capture_mode;
+        bool required_network_service_license_on_launch_flag;
+    } control_t;
+    NacpStruct nacp;
+} Nca_Option_t;
+
+typedef struct
+{
     uint32_t media_start_offset; // divided by 0x200.
     uint32_t media_end_offset;   // divided by 0x200.
     uint32_t _0x8;               // unkown.
@@ -199,7 +217,7 @@ NcmContentId nca_get_id_from_string(const char *nca_in_string);
 */
 
 //
-bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out);
+//bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out);
 
 //
 void nca_encrypt_header(nca_header_t *header);

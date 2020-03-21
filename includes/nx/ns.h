@@ -21,10 +21,10 @@ bool init_ns(void);
 void exit_ns(void);
 
 // returns the total size of the sd card.
-size_t ns_get_storage_total_size(NcmStorageId storage_id);
+int64_t ns_get_storage_total_size(NcmStorageId storage_id);
 
 // returns the free space on the sd card.
-size_t ns_get_storage_free_space(NcmStorageId storage_id);
+int64_t ns_get_storage_free_space(NcmStorageId storage_id);
 
 // store data found to out.
 // make sure to set the size of the out large enough.
@@ -52,12 +52,23 @@ bool ns_check_if_can_deliver_app_info(NsApplicationDeliveryInfo *info0, int32_t 
 //
 int32_t ns_list_content_meta_key(NcmContentMetaKey *meta, NsApplicationDeliveryInfo *info);
 
+//
+int32_t ns_count_application_record(uint64_t app_id);
 
-// seems to always return 4.
-uint32_t ns_count_application_record(uint64_t app_id);
+//
+Result ns_delete_application_entity(uint64_t app_id);
 
 //
 Result ns_delete_application_completely(uint64_t app_id);
+
+//
+bool ns_is_application_moveable(uint64_t app_id, NcmStorageId storage_id);
+
+//
+Result ns_move_application(uint64_t app_id, NcmStorageId storage_id);
+
+//
+NsApplicationOccupiedSize ns_get_application_occupied_size(uint64_t app_id);
 
 // push an application record.
 Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, size_t data_size);
@@ -66,7 +77,7 @@ Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, s
 Result ns_delete_application_record(uint64_t app_id);
 
 // count the amount of content already installed.
-uint32_t ns_count_application_content_meta(uint64_t app_id);
+int32_t ns_count_application_content_meta(uint64_t app_id);
 
 // write all existing content to void *out_buf. Call this after count_out > 1.
 Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id, void *out_buf, size_t out_buf_size, uint32_t count);

@@ -103,16 +103,17 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
         {
             // get the app_id.
             gamecard->app_id = ncm_get_app_id_from_title_id(header.title_id, NcmContentMetaType_Application);
-
-            NsApplicationControlData control_data = {0};
-            ns_get_app_control_data(&control_data, gamecard->app_id);
-
-            strcpy(gamecard->cnmt_name, d->d_name);
-            gamecard->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
-            gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
-            gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
             gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
             gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(header.key_gen ? header.key_gen : header.old_key_gen));
+            strcpy(gamecard->cnmt_name, d->d_name);
+            
+            NsApplicationControlData control_data = {0};
+            if (ns_get_app_control_data(&control_data, gamecard->app_id))
+            {
+                gamecard->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
+                gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
+                gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
+            }
         }
     }
 
@@ -241,6 +242,7 @@ bool unmount_gc(gamecard_t *gamecard)
     return true;
 }
 
+#include "nx/crypto.h"
 bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
 {
     if (!gamecard)
@@ -257,11 +259,16 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
-    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen))
+    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen) && !is_lower_key_gen_enabled())
     {
-        write_log("Too low of a fw version to install this game\n");
-        ui_display_error_box(ErrorCode_Install_KeyGen);
-        return false;
+        if (!has_keys() || !has_key_gen(gamecard->key_gen) || !ui_display_yes_no_box("The game has a higher keygen. Enable lower keygen?"))
+        {
+            write_log("Too low of a fw version to install this game\n");
+            ui_display_error_box(ErrorCode_Install_KeyGen);
+            return false;
+        }
+
+        //enable
     }
 
     if (ns_get_storage_free_space(storage_id) <= gamecard->size)
@@ -290,7 +297,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
     cnmt.cnmt_info.content_id = content_id;
     cnmt.storage_id = storage_id;
 
-    if (R_FAILED(cnmt_open(&cnmt)))
+    if (R_FAILED(cnmt_open(&cnmt, get_file_size(gamecard->cnmt_name))))
     {
         write_log("failed to install cnmt\n");
         ui_display_error_box(ErrorCode_Install_Cnmt);
@@ -298,7 +305,7 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
-    for (uint32_t i = 1; i < cnmt.total_cnmt_infos; i++)
+    for (uint32_t i = 1; appletMainLoop() && i < cnmt.total_cnmt_infos; i++)
     {
         if (!nca_start_install(cnmt.cnmt_infos[i].content_id, storage_id))
         {

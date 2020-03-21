@@ -286,6 +286,14 @@ Result fs_open_nand(FsFileSystem *out, const char *path)
     return rc;
 }
 
+Result fs_open_nand_partition(FsFileSystem *out, FsBisPartitionId partition)
+{
+    Result rc = fsOpenBisFileSystem(out, partition, ""); // what is the string for?
+    if (R_FAILED(rc))
+        write_log("failed to open nand filesystem partition: %u partition\n");
+    return rc;
+}
+
 bool fs_open_gamecard(FsGameCardHandle handle, FsGameCardPartition partition, FsFileSystem *out)
 {
     Result rc = fsOpenGameCardFileSystem(out, &handle, partition);

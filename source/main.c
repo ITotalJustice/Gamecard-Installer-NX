@@ -14,6 +14,7 @@
 #include "nx/ncm.h"
 #include "nx/crypto.h"
 #include "nx/set.h"
+#include "nx/lbl.h"
 
 #include "ui/menu.h"
 #include "ui/gc.h"
@@ -36,6 +37,7 @@ void app_init()
 	init_log();
 	#endif
 
+	init_lbl();
 	init_ns();
 	init_ncm();
 	init_set();
@@ -58,6 +60,7 @@ void app_exit()
 	exit_crypto();
 	exit_ns();
 	exit_ncm();
+	exit_lbl();
 	exit_set();
 	exit_font();
 	exit_musicnx();
@@ -78,6 +81,8 @@ void setup_app_dir(const char *nro)
 
 int main(int argc, char *argv[])
 {
+	appletLockExit();
+
 	// init everything.
 	app_init();
 	
@@ -89,5 +94,6 @@ int main(int argc, char *argv[])
 
 	// cleanup before exiting.
 	app_exit();
+	appletUnlockExit();
 	return 0;
 }

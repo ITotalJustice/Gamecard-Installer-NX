@@ -8,7 +8,7 @@
 
 void create_sound_cfg_default(sound_cfg *out)
 {
-    out->flags = MIX_INIT_FLAC | MIX_INIT_MOD | MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_MID | MIX_INIT_OPUS;
+    out->flags = MIX_INIT_MP3 | MIX_INIT_OGG;
     out->freq = MIX_DEFAULT_FREQUENCY;
     out->format = MIX_DEFAULT_FORMAT;
     out->channels = DEFAULT_CHANNELS;
@@ -18,7 +18,7 @@ void create_sound_cfg_default(sound_cfg *out)
 
 void init_sound(sound_cfg *cfg)
 {
-    Mix_Init(MIX_INIT_FLAC | MIX_INIT_MOD | MIX_INIT_MP3 | MIX_INIT_OGG | MIX_INIT_MID | MIX_INIT_OPUS);
+    Mix_Init(cfg->flags);
     Mix_OpenAudio(cfg->freq, cfg->format, cfg->channels, cfg->chunk_size);
     // the music is very loud by default, so i reduce the volume by /4.
     Mix_VolumeMusic(cfg->volume);

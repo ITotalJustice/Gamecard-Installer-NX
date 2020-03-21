@@ -2,7 +2,7 @@
 #include <SDL2/SDL.h>
 
 #include "gfx/SDL_easy.h"
-#include "image.h"
+#include "gfx/image.h"
 
 
 image_t *__create_image(SDL_Texture *texture, int x, int y, int w, int h)
@@ -32,26 +32,31 @@ image_t *create_image_from_mem(void *mem, size_t mem_size, int x, int y, int w, 
 
 void draw_image2(image_t *image)
 {
+    if (!image) return;
     SDL_DrawImageScale(image->texture, image->rect.x, image->rect.y, image->rect.w, image->rect.h);
 }
 
 void draw_image_scale(image_t *image, int w, int h)
 {
+    if (!image) return;
     SDL_DrawImageScale(image->texture, image->rect.x, image->rect.y, w, h);
 }
 
 void draw_image_position(image_t *image, int x, int y)
 {
+    if (!image) return;
     SDL_DrawImageScale(image->texture, x, y, image->rect.w, image->rect.h);
 }
 
 void draw_image_set(image_t *image, int x, int y, int w, int h)
 {
+    if (!image) return;
     SDL_DrawImageScale(image->texture, x, y, w, h);
 }
 
 void set_image(image_t *image, int x, int y, int w, int h)
 {
+    if (!image) return;
     image->rect.x = x;  image->rect.y = y; image->rect.w = w; image->rect.h = h;
 }
 

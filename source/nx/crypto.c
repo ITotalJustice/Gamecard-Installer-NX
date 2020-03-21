@@ -1,10 +1,22 @@
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 #include <switch.h>
 
 #include "nx/crypto.h"
 #include "nx/nca.h"
+#include "util/util.h"
+#include "util/file.h"
 
+typedef struct
+{
+    uint8_t total;
+    nca_key_area_t *keak;
+} keyz_t;
+
+bool g_has_keyz = false;
+keyz_t g_keyz = {0};
 
 uint8_t g_header_kek_src[0x10] = { 0x1F, 0x12, 0x91, 0x3A, 0x4A, 0xCB, 0xF0, 0x0D, 0x4C, 0xDE, 0x3A, 0xF6, 0xD5, 0x23, 0x88, 0x2A };
 uint8_t g_header_key_src[0x20] = { 0x5A, 0x3E, 0xD8, 0x4F, 0xDE, 0xC0, 0xD8, 0x26, 0x31, 0xF7, 0xE2, 0x5D, 0x19, 0x7B, 0xF5, 0xD0, 0x1C, 0x9B, 0x7B, 0xFA, 0xF6, 0x28, 0x18, 0x3D, 0x71, 0xF6, 0x4D, 0x73, 0xF1, 0x50, 0xB9, 0xD2 };
@@ -13,6 +25,7 @@ const uint8_t g_keak_application_source[0x10] = { 0x7F, 0x59, 0x97, 0x1E, 0x62, 
 const uint8_t g_keak_ocean_source[0x10] = { 0x32, 0x7D, 0x36, 0x08, 0x5A, 0xD1, 0x75, 0x8D, 0xAB, 0x4E, 0x6F, 0xBA, 0xA5, 0x55, 0xD8, 0x82 };
 const uint8_t g_keak_system_source[0x10] = { 0x87, 0x45, 0xF1, 0xBB, 0xA6, 0xBE, 0x79, 0x64, 0x7D, 0x04, 0x8B, 0xA6, 0x7B, 0x5F, 0xDA, 0x4A };
 
+bool parse_keys(void);
 
 bool init_crypto(void)
 {
@@ -32,12 +45,170 @@ bool init_crypto(void)
     {
         return false;
     }
+    g_has_keyz = parse_keys();
     return true;
 }
 
 void exit_crypto(void)
 {
     splCryptoExit();
+    if (g_has_keyz && g_keyz.keak)
+        free(g_keyz.keak);
+}
+
+bool has_keys(void)
+{
+    return g_has_keyz;
+}
+
+bool has_key_gen(uint8_t key_gen)
+{
+    if (!has_keys()) return false;
+    return g_keyz.total - 1 >= key_gen;
+}
+
+const uint8_t *get_keak(uint8_t key_gen)
+{
+    if (!has_keys() || !has_key_gen(key_gen)) return NULL; 
+    return g_keyz.keak[key_gen].area;
+}
+
+size_t __get_file_size(FILE *fp)
+{
+    if (!fp) return 0;
+    size_t off = ftell(fp);
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    fseek(fp, off, SEEK_SET);
+    return size;
+}
+
+bool find_keys_file(char **out, size_t *out_size)
+{
+    if (!out || !out_size) return false;
+
+    const char *KEY_PATHS[] =
+    {
+        // default
+        "sdmc:/switch/prod.keys",
+        "sdmc:/switch/keys.txt",
+
+        // inside app folder
+        "sdmc:/switch/gamecard_installer/prod.keys",
+        "sdmc:/switch/gamecard_installer/keys.txt",
+    };
+
+    FILE *fp;
+    for (int i = 0; i < 4; i++)
+    {
+        fp = fopen(KEY_PATHS[i], "r");
+        if (fp)
+        {
+            *out_size = __get_file_size(fp) + 1;
+            if (*out_size > 0x800000)
+            {
+                fclose(fp);
+                return false;
+            }
+            *out = malloc(*out_size);
+            if (!(*out))
+            {
+                fclose(fp);
+                return false;
+            }
+            fread(*out, *out_size - 1, 1, fp);
+            fclose(fp);
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
+* Code from nxdumptool. Many thanks.
+* https://github.com/DarkMatterCore/nxdumptool/blob/e475796676968b6d78cd2f4dce88403e0af7b58b/source/keys.c#L564
+*/
+char hextoi(char c)
+{
+    if ('a' <= c && c <= 'f') return (c - 'a' + 0xA);
+    if ('A' <= c && c <= 'F') return (c - 'A' + 0xA);
+    if ('0' <= c && c <= '9') return (c - '0');
+    return 'Z';
+}
+
+bool parse_hex_key(nca_key_area_t *keak, const char *hex, uint32_t len)
+{
+    uint32_t _len = len * 2;
+    //if (!key || !hex || strlen(hex) < _len) return false;
+
+    char lowerU64[0x11]     = {0};
+    char upperU64[0x11]     = {0};
+    memcpy(lowerU64, hex, 16);
+    memcpy(upperU64, hex + 16, 16);
+    *(uint64_t *)keak->area = __bswap64(strtoul(lowerU64, NULL, 16));
+    *(uint64_t *)(keak->area + 8) = __bswap64(strtoul(upperU64, NULL, 16));
+
+    return true;;
+}
+/*
+* end of code from nxdumptool.
+*/
+
+bool parse_keys(void)
+{
+    // find keys.
+    char *buf = {0};
+    size_t size = 0;
+    if (!find_keys_file(&buf, &size))
+    {
+        return false;
+    }
+
+    const char *key_text = "key_area_key_application_";
+    uint8_t key_total = 0;
+    char parse_string[0x100] = {0};
+    char *st = {0};
+    char *ed = buf;
+
+    while (key_total < 0xFF)
+    {
+        if (key_total > 0xF)
+            sprintf(parse_string, "%s%x", key_text, key_total);
+        else
+            sprintf(parse_string, "%s0%x", key_text, key_total);
+
+        if ((ed = strstr(ed, parse_string)))
+        {
+            if (!key_total)
+                st = ed;
+            key_total++;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    if (st)
+    {
+        g_keyz.total = key_total;
+        g_keyz.keak = calloc(1, sizeof(nca_key_area_t) * key_total);
+
+        uint8_t skip = strlen(key_text) + 2 + 3;
+        for (uint8_t i = 0; i < key_total; i++)
+        {
+            st += skip;
+            if (!parse_hex_key(&g_keyz.keak[i], st, sizeof(nca_key_area_t)))
+            {
+                g_keyz.total = i;
+                free(buf);
+                return false;
+            }
+            st += (sizeof(nca_key_area_t) * 2) + 1;
+        }
+    }
+    free(buf);
+    return true;
 }
 
 const uint8_t *return_keak_source(uint8_t crypto_type)

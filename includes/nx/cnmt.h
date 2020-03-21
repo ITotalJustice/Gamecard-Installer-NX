@@ -23,7 +23,6 @@ typedef struct
 
 typedef struct
 {
-    char cnmt_name[1024];
     FsFile cnmt_file;
     uint32_t total_cnmt_infos;
     NcmContentInfo cnmt_info;
@@ -39,6 +38,6 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
 void cnmt_read_data(cnmt_struct_t *cnmt_struct);
 
 // open the cnmt.
-Result cnmt_open(cnmt_struct_t *cnmt_struct);
+Result cnmt_open(cnmt_struct_t *cnmt_struct, uint64_t size);
 
 #endif

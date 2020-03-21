@@ -235,7 +235,6 @@ void free_tetris(void)
 
 bool init_menu(void)
 {
-    // delete all exiting placeholders.
     ncm_delete_all_placeholders();
 
     // romfs will contain the empty icon and sound effects.
@@ -455,6 +454,262 @@ void ui_display_popup_box(void)
     SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
 }
 
+bool g_lower_key_gen = false;
+bool g_enable_bl = true;
+#include "nx/crypto.h"
+
+bool is_lower_key_gen_enabled(void)
+{
+    return g_lower_key_gen;
+}
+
+bool is_bl_enabled(void)
+{
+    return g_enable_bl;
+}
+
+void ui_draw_spacers(int x, int y, int txt_size)
+{
+    SDL_DrawShape(Colour_Nintendo_Silver, x - 25, y-18, 500 + 50, 1, true);
+    SDL_DrawShape(Colour_Nintendo_Silver, x - 25, y+txt_size+18, 500 + 50, 1, true);
+}
+
+void ui_draw_highlight_box(pulsing_shape_t *pulse_shape, int x, int y, int w, int h)
+{
+    SDL_DrawShapeOutlineEX(pulse_shape->pulse.col.r, pulse_shape->pulse.col.g, pulse_shape->pulse.col.b, pulse_shape->pulse.col.a, x - 20, y - 20, w, h + 20, 5);
+    update_pulse_colour(&pulse_shape->pulse);
+}
+
+void ui_display_options_sub_menu(void)
+{
+
+}
+
+void ui_display_options(void)
+{
+    pulsing_shape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
+    
+    const char *expl_keygen[] =
+    {
+        "This will re-encrypt the key area of all the nca's with keygen 0.",
+        "Allows the game to be launched on ALL firmware versions.",
+        "Some games might use syscalls only avaliable on higher firmware.",
+    };
+
+    const char *expl_bl[] =
+    {
+        "Enable / disable the backlight while installing.",
+        "The screen will stay off until the game finishes installing",
+    };
+
+    const char *expl_mus[] =
+    {
+        "Enable / disable the music playback.",
+    };
+
+    const char *expl_snd[] =
+    {
+        "Enable / disable the sound effects",
+    };
+
+    // i really cba to write a nice ui system. maybe someday, but not today.
+    // whilst doing all of this manually is pretty insane and does not scale well, at least it looks nice.
+    SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
+    bool _has_keys = has_keys();
+    bool _music = true;
+    bool _sound = true;
+    uint8_t cursor = 0;
+    uint8_t r_cursor = 0;
+    bool left_column = true;
+
+    uint8_t cursor_max[] = { 2, 2, 0 };
+
+    while (appletMainLoop())
+    {
+        input_t input = get_input();
+
+        if (input.down & KEY_B)
+        {
+            break;
+        }
+
+        else if (input.down & KEY_LEFT)
+        {
+            left_column = true;
+        }
+        else if (input.down & KEY_RIGHT)
+        {
+            left_column = false;
+        }
+
+        else if (input.down & KEY_DOWN)
+        {
+            if (left_column)
+            {
+                r_cursor = 0;
+                cursor = move_cursor_down(cursor, 3);
+            }
+            else
+            {
+                r_cursor = move_cursor_down(r_cursor, cursor_max[cursor]);
+            }
+        }
+        else if (input.down & KEY_UP)
+        {
+            if (left_column)
+            {
+                r_cursor = 0;
+                cursor = move_cursor_up(cursor, 3);
+            }
+            else
+            {
+                r_cursor = move_cursor_up(r_cursor, cursor_max[cursor]);
+            }
+        }
+
+        else if (input.down & KEY_A)
+        {
+            if (cursor == 3 && left_column) break;
+            if (left_column) left_column = !left_column;
+            else
+            {
+                switch (cursor)
+                {
+                    case 0:
+                    {
+                        switch (r_cursor)
+                        {
+                            case 0:
+                            {
+                                if (_has_keys) g_lower_key_gen = !g_lower_key_gen;
+                                break;
+                            }
+                            case 1:
+                            {
+                                g_enable_bl = !g_enable_bl;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                    case 1:
+                    {
+                        switch (r_cursor)
+                        {
+                            case 0:
+                            {
+                                _music = !_music;
+                                break;
+                            }
+                            case 1:
+                            {
+                                _sound = !_sound;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        //ui_display_popup_box();
+        ui_display_dim_background();
+        SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
+        SDL_DrawShape(Colour_Nintendo_LightBlack, box.x + 275, box.y + 72, box.w - 275, box.h - 72 - 75, true);
+
+        // title
+        SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + 75, box.w - 50, 2, true);
+        SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + box.h - 75, box.w - 50, 2, true);
+        SDL_DrawText(FONT_TEXT[QFontSize_28].fnt, box.x + 60, box.y + 30, Colour_Nintendo_White, "Settings");
+        
+
+        const char *hdr[] = 
+        {
+            "Installation",
+            "Sounds",
+            "Exit",
+        };
+
+        for (int i = 0, y = box.y + 155; i < 3; i++, y += 100)
+        {
+            SDL_DrawText(FONT_TEXT[QFontSize_25].fnt, box.x + 50, y, cursor == i ? Colour_Nintendo_Cyan : Colour_Nintendo_White, "%s", hdr[i]);
+            if (cursor == i)
+            {
+                SDL_DrawShape(Colour_Nintendo_Cyan, box.x + 40, y - 4, 4, 25 + 8, true);
+                if (left_column)
+                {
+                    ui_draw_highlight_box(&pulse_shape, box.x + 50, y, 200, 40);
+                }
+            }
+        }
+        
+        switch (cursor)
+        {
+            case 0:
+            {
+                //keygen
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 140, Colour_Nintendo_White, "Lower Keygen Version");
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 140, g_lower_key_gen ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", g_lower_key_gen ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 140, 23);
+                if (!left_column && r_cursor == 0)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 140, 550, 40);
+                for (int i = 0, y = box.y + 190; i < 3; i++, y+= 25)
+                {
+                    SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_keygen[i]);
+                }
+
+                //backlight
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 315, Colour_Nintendo_White, "Backlight Whilst Installing");
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 315, g_enable_bl ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", g_enable_bl ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 315, 23);
+                if (!left_column && r_cursor == 1)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 315, 550, 40);
+                for (int i = 0, y = box.y + 365; i < 2; i++, y+= 25)
+                {
+                    SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_bl[i]);
+                }
+                break;
+            }
+            case 1:
+            {
+                //music
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 140, Colour_Nintendo_White, "Music");
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 140, _music ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", _music ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 140, 23);
+                if (!left_column && r_cursor == 0)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 140, 550, 40);
+                for (int i = 0, y = box.y + 190; i < 1; i++, y+= 25)
+                {
+                    SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_mus[i]);
+                }
+
+                //sound
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 270, Colour_Nintendo_White, "Sound Effects");
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 270, _sound ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", _sound ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 270, 23);
+                if (!left_column && r_cursor == 1)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 270, 550, 40);
+                for (int i = 0, y = box.y + 320; i < 1; i++, y+= 25)
+                {
+                    SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_snd[i]);
+                }
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+
+        SDL_UpdateRenderer();
+    }
+}
+
 bool ui_display_yes_no_box(const char *message)
 {
     uint8_t cursor = 1;
@@ -627,7 +882,6 @@ void render_menu(void)
 }
 
 
-
 /*
 *   Basic input handling.
 */
@@ -661,6 +915,11 @@ uint8_t handle_input(void)
             return Option_Exit;  
     }
 
+    if (input.down & KEY_Y)
+    {
+        ui_display_options();
+    }
+
     int ret = check_if_option(&input);
     if (ret != -1)
     {
@@ -678,8 +937,7 @@ uint8_t handle_input(void)
                 {
                     if (ui_display_yes_no_box("Install to the Nand?"))
                     {
-                        if (!install_gc(&gamecard, NcmStorageId_BuiltInUser))
-                            ncm_delete_all_placeholders();
+                        install_gc(&gamecard, NcmStorageId_BuiltInUser);
                         update_storage_size();
                     }
                 }
@@ -689,8 +947,7 @@ uint8_t handle_input(void)
                 {
                     if (ui_display_yes_no_box("Install to the Sd Card?"))
                     {
-                        if (!install_gc(&gamecard, NcmStorageId_SdCard))
-                            ncm_delete_all_placeholders();
+                        install_gc(&gamecard, NcmStorageId_SdCard);
                         update_storage_size();
                     }
                 }

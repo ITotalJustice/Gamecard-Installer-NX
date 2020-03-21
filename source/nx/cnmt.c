@@ -31,7 +31,7 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     uint64_t data_offset = 0;
 
     // store all the data.
-    memcpy(&data[data_offset], &ncm_cnmt_header, sizeof(NcmContentMetaHeader));
+    memcpy(data, &ncm_cnmt_header, sizeof(NcmContentMetaHeader));
     memcpy(&data[data_offset += sizeof(NcmContentMetaHeader)], ext_header, ncm_cnmt_header.extended_header_size);
     memcpy(&data[data_offset += ncm_cnmt_header.extended_header_size], cnmt_struct->cnmt_infos, ncm_cnmt_header.content_count * sizeof(NcmContentInfo));
 
@@ -43,11 +43,11 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
     ncm_close_database(&db);
     free(data);
 
-    uint8_t *app_record = calloc(1, sizeof(ContentStorageRecord));
+    ContentStorageRecord *app_record = calloc(1, sizeof(ContentStorageRecord));
     size_t app_record_size = 0;
 
     // check if any app_cnmt data exists, if so, add it to the start of the app_record buffer.
-    uint32_t cnmt_count = ns_count_application_content_meta(app_id);
+    int32_t cnmt_count = ns_count_application_content_meta(app_id);
     if (cnmt_count)
     {
         app_record_size = cnmt_count * sizeof(ContentStorageRecord);
@@ -55,13 +55,13 @@ void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, vo
 
         ns_list_application_record_content_meta(0, app_id, old_app_buf, app_record_size, cnmt_count);
 
-        app_record = realloc(app_record, app_record_size + sizeof(ContentStorageRecord)); // 
+        app_record = realloc(app_record, app_record_size + sizeof(ContentStorageRecord));
         memcpy(app_record, old_app_buf, app_record_size);
         free(old_app_buf);
     }
 
     // push record.
-    memcpy(&app_record[app_record_size], &cnmt_storage_record, sizeof(ContentStorageRecord));
+    memcpy(app_record + app_record_size, &cnmt_storage_record, sizeof(ContentStorageRecord));
     ns_delete_application_record(app_id);
     ns_push_application_record(app_id, app_record, (cnmt_count + 1) * sizeof(ContentStorageRecord));
     free(app_record);
@@ -142,7 +142,7 @@ Result cnmt_open_cnmt_file(FsFileSystem *cnmt_system, FsDir *cnmt_dir, cnmt_stru
     return 0;
 }
 
-Result cnmt_open(cnmt_struct_t *cnmt_struct)
+Result cnmt_open(cnmt_struct_t *cnmt_struct, uint64_t size)
 {
     Result rc = 0;
     NcmContentStorage cnmt_storage = {0};
@@ -178,7 +178,7 @@ Result cnmt_open(cnmt_struct_t *cnmt_struct)
 
     fs_close_dir(&cnmt_dir);
 
-    *cnmt_struct->cnmt_info.size = fs_get_file_size(&cnmt_struct->cnmt_file);
+    memcpy(cnmt_struct->cnmt_info.size, &size, 0x6);
     
     // parse the cnmt data.
     cnmt_read_data(cnmt_struct);

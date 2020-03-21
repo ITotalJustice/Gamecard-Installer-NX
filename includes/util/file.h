@@ -40,7 +40,7 @@ void copy_file(const char *src, char *dest);
 // move file (rename).
 void move_file(const char *src, char *dest);
 
-
+size_t get_file_size2(FILE *fp);
 /*
 *   DATA READ / DATA WRITE.
 */

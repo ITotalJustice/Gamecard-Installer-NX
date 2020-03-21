@@ -6,27 +6,41 @@
 #include "util/log.h"
 
 
+Service NS_APP_SERV = {0};
+
+Result __ns_get_application_service(void)
+{
+    if (hosversionBefore(3, 0, 0))
+        return smGetService(&NS_APP_SERV, "ns:am");
+    else
+        return nsGetApplicationManagerInterface(&NS_APP_SERV);
+}
+
+
 bool init_ns(void)
 {
-    return R_FAILED(nsInitialize()) ? false : true;
+    if (R_FAILED(nsInitialize())) return false;
+    if (R_FAILED(__ns_get_application_service())) return false;
+    return true;
 }
 
 void exit_ns(void)
 {
+    serviceClose(&NS_APP_SERV);
     nsExit();
 }
 
-size_t ns_get_storage_total_size(NcmStorageId storage_id)
+int64_t ns_get_storage_total_size(NcmStorageId storage_id)
 {
-    size_t size = 0;
+    int64_t size = 0;
     if (R_FAILED(nsGetTotalSpaceSize(storage_id, &size)))
         write_log("failed to get ns total storage size\n");
     return size;
 }
 
-size_t ns_get_storage_free_space(NcmStorageId storage_id)
+int64_t ns_get_storage_free_space(NcmStorageId storage_id)
 {
-    size_t size = 0;
+    int64_t size = 0;
     if (R_FAILED(nsGetFreeSpaceSize(storage_id, &size)))
         write_log("failed to get ns total free space\n");
     return size;
@@ -37,8 +51,6 @@ int32_t ns_list_app_record(NsApplicationRecord *out, int32_t count, int32_t offs
     int32_t out_count = 0;
     if (R_FAILED(nsListApplicationRecord(out, count, offset, &out_count)))
         write_log("failed to list app records\n");
-    if (out_count != count)
-        write_log("ns_list_app_record missmatch: got %d, expected %d\n", out_count, count);
     return out_count;
 }
 
@@ -47,8 +59,6 @@ int32_t ns_list_app_cnmt_status(NsApplicationContentMetaStatus *out, int32_t cou
     int32_t out_count = 0;
     if (R_FAILED(nsListApplicationContentMetaStatus(app_id, 0, out, count, &out_count)))
         write_log("failed to list cnmt status\n");
-    if (out_count != count)
-        write_log("ns_list_cnmt_status missmatch: got %d, expected %d\n", out_count, count);
     return out_count;
 }
 
@@ -113,10 +123,10 @@ int32_t ns_list_content_meta_key(NcmContentMetaKey *meta, NsApplicationDeliveryI
     return total_out;
 }
 
-uint32_t ns_count_application_record(uint64_t app_id) // always returns 4 if app exists... is that the number of ncas?
+int32_t ns_count_application_record(uint64_t app_id)
 {
-    uint32_t count = 0;
-    Result rc = serviceDispatchInOut(nsGetServiceSession_ApplicationManagerInterface(), 1, app_id, count, SfOutHandleAttr_None);
+    int32_t count = 0;
+    Result rc = serviceDispatchInOut(&NS_APP_SERV, 1, app_id, count, SfOutHandleAttr_None);
     if (R_FAILED(rc))
         write_log("failed to count application records\n");
     return count;
@@ -124,31 +134,40 @@ uint32_t ns_count_application_record(uint64_t app_id) // always returns 4 if app
 
 Result ns_delete_application_entity(uint64_t app_id)
 {
-    Result rc = serviceDispatchIn(nsGetServiceSession_ApplicationManagerInterface(), 4, app_id, SfOutHandleAttr_None);
+    Result rc = nsDeleteApplicationEntity(app_id);
     if (R_FAILED(rc))
         write_log("failed to delete application entity\n");
     return rc;
 }
 
-Result ns_delete_application_completely(uint64_t app_id) // always fails, even though it does delete the application......
+Result ns_delete_application_completely(uint64_t app_id)
 {
-    Result rc = serviceDispatchIn(nsGetServiceSession_ApplicationManagerInterface(), 5, app_id, SfOutHandleAttr_None);
+    Result rc = nsDeleteApplicationCompletely(app_id);
     if (R_FAILED(rc))
         write_log("failed to delete application completely\n");
     return rc;
 }
 
-bool ns_is_application_moveable(uint64_t app_id)
+bool ns_is_application_moveable(uint64_t app_id, NcmStorageId storage_id)
 {
     bool can_move = false;
-    //8
+    if (R_FAILED(nsIsApplicationEntityMovable(app_id, storage_id, &can_move)))
+        write_log("failed to check if application %lu is moveable to storage_id %u\n", app_id, storage_id);
     return can_move;
 }
 
-size_t ns_get_application_occupied_size(uint64_t app_id)
+Result ns_move_application(uint64_t app_id, NcmStorageId storage_id)
 {
-    size_t size = 0;
-    Result rc = serviceDispatchInOut(nsGetServiceSession_ApplicationManagerInterface(), 11, app_id, size, SfOutHandleAttr_None);
+    Result rc = nsMoveApplicationEntity(app_id, storage_id);
+    if (R_FAILED(rc))
+        write_log("failed to move application %lu to storage_id %u\n", app_id, storage_id);
+    return rc;
+}
+
+NsApplicationOccupiedSize ns_get_application_occupied_size(uint64_t app_id)
+{
+    NsApplicationOccupiedSize size = {0};
+    Result rc = nsCalculateApplicationOccupiedSize(app_id, &size);
     if (R_FAILED(rc))
         write_log("failed to delete application record\n");
     return size;
@@ -163,7 +182,7 @@ Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, s
         uint64_t app_id;
     } in = { NsApplicationRecordType_Installed, {0}, app_id };
     
-    Result rc =  serviceDispatchIn(nsGetServiceSession_ApplicationManagerInterface(), 16, in,
+    Result rc =  serviceDispatchIn(&NS_APP_SERV, 16, in,
         .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In },
         .buffers = { { cnmt_storage_records, data_size } });
 
@@ -181,29 +200,27 @@ Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id,
     } in = { offset, app_id };
     uint32_t out = 0;
 
-    Result rc = serviceDispatchInOut(nsGetServiceSession_ApplicationManagerInterface(), 17, in, out,
+    Result rc = serviceDispatchInOut(&NS_APP_SERV, 17, in, out,
         .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
         .buffers = { { out_buf, out_buf_size } });
 
     if (R_FAILED(rc))
         write_log("failed to list app cnmt\n");
-    if (count != out)
-        write_log("count difference\n");
     return rc;
 }
 
 Result ns_delete_application_record(uint64_t app_id)
 {
-    Result rc = serviceDispatchIn(nsGetServiceSession_ApplicationManagerInterface(), 27, app_id, SfOutHandleAttr_None);
+    Result rc = serviceDispatchIn(&NS_APP_SERV, 27, app_id, SfOutHandleAttr_None);
     if (R_FAILED(rc))
         write_log("failed to delete application record\n");
     return rc;
 }
 
-uint32_t ns_count_application_content_meta(uint64_t app_id) // need a function to check if it has at least 1 content meta, currently will fail if non exists.
+int32_t ns_count_application_content_meta(uint64_t app_id) // need a function to check if it has at least 1 content meta, currently will fail if non exists.
 {
-    uint32_t count = 0;
-    Result rc = serviceDispatchInOut(nsGetServiceSession_ApplicationManagerInterface(), 600, app_id, count, SfOutHandleAttr_None);
+    int32_t count = 0;
+    Result rc = nsCountApplicationContentMeta(app_id, &count);
     if (R_FAILED(rc))
         write_log("failed to count app cnmt\n");
     return count;

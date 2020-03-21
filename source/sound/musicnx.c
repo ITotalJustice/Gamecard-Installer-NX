@@ -79,6 +79,8 @@ int play_song_thrd(void *in)
         // sleep for a 100th of a second. No need to burn cycles!
         thrd_sleep(&sleep_time, NULL);
     }
+    //Mix_PlayingMusic()
+    //g_continue_flag
     return 0;
 }
 

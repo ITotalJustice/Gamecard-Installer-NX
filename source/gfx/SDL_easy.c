@@ -109,7 +109,7 @@ SDL_Texture *SDL_ImageLoadMem(void *data, int size)
 
 void SDL_DrawText(TTF_Font *font, int x, int y, Colour colour, const char *text, ...)
 {
-    char full_text[0x100];
+    char full_text[0x100] = {0};
     va_list argv;
     va_start(argv, text);
     vsnprintf(full_text, sizeof(full_text), text, argv);
@@ -126,7 +126,7 @@ void SDL_DrawText(TTF_Font *font, int x, int y, Colour colour, const char *text,
 
 void SDL_DrawTextCenterX(TTF_Font *font, int y, int clip_x, int clip_w, Colour colour, const char *text, ...)
 {
-    char full_text[0x100];
+    char full_text[0x100] = {0};
     va_list argv;
     va_start(argv, text);
     vsnprintf(full_text, sizeof(full_text), text, argv);

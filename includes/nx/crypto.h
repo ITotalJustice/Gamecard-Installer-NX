@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "nx/nca.h"
+
 
 typedef enum
 {
@@ -22,6 +24,18 @@ bool init_crypto(void);
 
 //
 void exit_crypto(void);
+
+//
+bool has_keys(void);
+
+//
+bool has_key_gen(uint8_t key_gen);
+
+//
+const uint8_t *get_keak(uint8_t key_gen);
+
+//
+
 
 //
 const uint8_t *return_keak_source(uint8_t crypto_type);

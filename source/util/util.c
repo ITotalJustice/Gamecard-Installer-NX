@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <switch.h>
 
 #include "util/util.h"
 
@@ -29,4 +30,18 @@ void *mem_alloc(size_t size)
         printf("failed to alloc mem with size %lu\n", size);
     memset(mem, 0, size);
     return mem;
+}
+
+void str2hex(uint8_t *out, const char *str)
+{
+    char b[0x12] = {0};
+    snprintf(b, 0x10, str);
+    long long num = __bswap64(strtol(b, NULL, 0x10));
+    memcpy(out, &num, 0x8);
+    printf("%lx", __bswap64(num));
+    snprintf(b, 0x10, str + 0x10);
+    num = 0;
+    num = __bswap64(strtol(b, NULL, 0x10));
+    memcpy(out + 0x8 + 1, &num, 0x8);
+    printf("%lx\n", __bswap64(num));
 }

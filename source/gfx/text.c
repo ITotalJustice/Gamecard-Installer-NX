@@ -47,6 +47,7 @@ text_t *create_text(font_t *font, int x, int y, Colour colour, const char *text,
 
 void draw_text(text_t *text)
 {
+    if (!text) return;
     SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, NULL, &text->rect);
 }
 
