@@ -45,26 +45,74 @@ text_t *create_text(font_t *font, int x, int y, Colour colour, const char *text,
     return __create_text(t, font, x, y, colour, full_text) ? t : NULL;
 }
 
+void enable_text_clip(text_t *text, int x, int y)
+{
+    if (!text) return;
+    text->clip.enabled = true;
+    text->clip.start_x = x;
+    text->clip.end_x = x;   
+}
+
+void disable_text_clip(text_t *text)
+{
+    if (!text) return;
+    text->clip.enabled = false;
+}
+
 void draw_text(text_t *text)
 {
     if (!text) return;
-    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, NULL, &text->rect);
+    SDL_Rect clip = { 0, 0, text->rect.w, text->rect.h };
+    if (text->clip.enabled)
+    {
+        clip.x = text->clip.start_x;
+        clip.w = text->clip.end_x;
+    }
+    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, &clip, &text->rect);
 }
 
 void draw_text_position(text_t *text, int x, int y)
 {
+    if (!text) return;
     SDL_Rect pos = { x, y, text->rect.w, text->rect.h };
-    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, NULL, &pos);
+    SDL_Rect clip = { 0, 0, text->rect.w, text->rect.h };
+    if (text->clip.enabled)
+    {
+        clip.x = text->clip.start_x;
+        clip.w = text->clip.end_x;
+    }
+    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, &clip, &pos);
+}
+
+void draw_text_right_align(text_t *text, int end_x, int y)
+{
+    if (!text) return;
+    SDL_Rect pos = { end_x - text->rect.w, y, text->rect.w, text->rect.h };
+    SDL_Rect clip = { 0, 0, text->rect.w, text->rect.h };
+    if (text->clip.enabled)
+    {
+        clip.x = text->clip.start_x;
+        clip.w = text->clip.end_x;
+    }
+    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, &clip, &pos);
 }
 
 void draw_text_scale(text_t *text, int w, int h)
 {
+    if (!text) return;
     SDL_Rect pos = { text->rect.x, text->rect.y, w, h };
-    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, NULL, &pos);
+    SDL_Rect clip = { 0, 0, text->rect.w, text->rect.h };
+    if (text->clip.enabled)
+    {
+        clip.x = text->clip.start_x;
+        clip.w = text->clip.end_x;
+    }
+    SDL_RenderCopy(SDL_GetRenderer(SDL_GetWindow()), text->tex, &clip, &pos);
 }
 
 void draw_text_set(text_t *text, int x, int y, int w, int h)
 {
+    if (!text) return;
     text->rect.x = x;
     text->rect.y = y;
     text->rect.w = w;
@@ -74,6 +122,7 @@ void draw_text_set(text_t *text, int x, int y, int w, int h)
 
 void position_text(text_t *text, int x, int y)
 {
+    if (!text) return;
     text->rect.x = x;
     text->rect.y = y;
 }
@@ -83,6 +132,7 @@ void set_text()
 
 void update_text(text_t *t, const char *text, ...)
 {
+    if (!t) return;
     SDL_DestroyTexture(t->tex);
     t->tex = NULL;
 

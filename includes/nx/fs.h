@@ -13,12 +13,29 @@ typedef enum
 
 typedef struct
 {
+    uint64_t title_id;
+    uint32_t version;
+} gamecard_update_partition_info_t;
+
+typedef struct
+{
+    uint8_t rsa[0x100];
+    uint32_t magic;
+    uint8_t _0x104[0x4];
+    uint8_t kek_index;
+    uint8_t _0x109[0x7];
+    uint8_t device_id[0x10];
+    uint8_t _0x120[0x10];
+    uint8_t encrypted_data;
+} gamecard_cert_t;
+
+typedef struct
+{
     uint8_t version;                 // always 1.
     uint8_t _0x01;                   // padding.
     uint64_t permissions_bitmask;
     uint32_t data_size;
     uint32_t content_owner_id_section_size;
-
 } fs_access_header_t;
 
 typedef struct
@@ -120,7 +137,7 @@ Result fs_open_sd_card(FsFileSystem *out, const char *path);
 Result fs_open_nand(FsFileSystem *out, const char *path);
 
 //
-bool fs_open_gamecard(FsGameCardHandle handle, FsGameCardPartition partition, FsFileSystem *out);
+bool fs_open_gamecard(const FsGameCardHandle *handle, FsGameCardPartition partition, FsFileSystem *out);
 
 //
 int64_t fs_get_system_free_space(FsFileSystem *system, const char *path, ...);
@@ -143,28 +160,28 @@ void fs_close_system(FsFileSystem *fs_system);
 */
 
 //
-Result fs_open_storage_by_current_process(FsStorage *out);
+bool fs_open_storage_by_current_process(FsStorage *out);
 
 //
-Result fs_open_storage_by_id(FsStorage *out, uint64_t data_id, NcmStorageId storage_id);
+bool fs_open_storage_by_id(FsStorage *out, uint64_t data_id, NcmStorageId storage_id);
 
 //
-bool fs_open_gamecard_storage(FsStorage *out, FsGameCardHandle handle);
+bool fs_open_gamecard_storage(FsStorage *out, FsGameCardHandle *handle);
 
 //
-Result fs_read_storage(FsStorage *storage, void *out, uint64_t size, int64_t offset);
+bool fs_read_storage(FsStorage *storage, void *out, uint64_t size, int64_t offset);
 
 //
-Result fs_write_stoarge(FsStorage *storage, const void *in, uint64_t size, int64_t offset);
+bool fs_write_stoarge(FsStorage *storage, const void *in, uint64_t size, int64_t offset);
 
 //
-Result fs_flush_storage(FsStorage *storage);
+bool fs_flush_storage(FsStorage *storage);
 
 //
 int64_t fs_get_storage_size(FsStorage *storage);
 
 //
-Result fs_set_storage_size(FsStorage *storage, int64_t size);
+bool fs_set_storage_size(FsStorage *storage, int64_t size);
 
 //
 void fs_close_storage(FsStorage *storage);
@@ -175,7 +192,7 @@ void fs_close_storage(FsStorage *storage);
 */
 
 //
-Result fs_open_device_operator(FsDeviceOperator *out);
+bool fs_open_device_operator(FsDeviceOperator *out);
 
 //
 bool fs_is_sd_card_inserted(FsDeviceOperator *d);
@@ -187,7 +204,7 @@ bool fs_is_gamecard_inserted(FsDeviceOperator *d);
 bool fs_get_gamecard_handle(FsGameCardHandle *out);
 
 //
-Result fs_get_gamecard_handle_from_device_operator(FsDeviceOperator *d, FsGameCardHandle *out);
+bool fs_get_gamecard_handle_from_device_operator(FsDeviceOperator *d, FsGameCardHandle *out);
 
 //
 uint8_t fs_get_game_card_attribute(FsDeviceOperator *d, const FsGameCardHandle *handle);
@@ -200,8 +217,11 @@ void fs_close_device_operator(FsDeviceOperator *d);
 *   FS MISC
 */
 
+//
+bool fs_open_system_with_content_id(FsFileSystem *fs, NcmContentStorage *cs, NcmContentId *content_id, FsFileSystemType type);
+
 // set the archive bit for a folder, to be used with split nsp's.
-Result fs_set_archive_bit(const char *path, ...);
+bool fs_set_archive_bit(const char *path, ...);
 
 // get free size of the sd card.
 int64_t fs_get_sd_free_space(void);
@@ -234,10 +254,25 @@ void fs_close_gamecard_handle(FsGameCardHandle *handle);
 Result fs_mount_sd_card(void);
 
 //
-int fs_mount_device(const char *name, FsFileSystem fs);
+bool fs_mount_device(const char *name, FsFileSystem fs);
 
 //
-bool fs_mount_gamecard_partition(char *out, const FsGameCardHandle handle, FsGameCardPartition partition);
+bool fs_mount_user(void);
+
+//
+bool fs_mount_system(void);
+
+//
+bool fs_mount_safe(void);
+
+//
+bool fs_mount_gamecard_update(const FsGameCardHandle *handle);
+
+//
+bool fs_mount_gamecard_secure(const FsGameCardHandle *handle);
+
+//
+bool fs_mount_gamecard_partition(char *out, const FsGameCardHandle *handle, FsGameCardPartition partition);
 
 //
 int fs_device_add_path(const char *in_path, char *out_path, FsFileSystem **out_device);
@@ -246,12 +281,34 @@ int fs_device_add_path(const char *in_path, char *out_path, FsFileSystem **out_d
 int fs_unmount_device(const char *device);
 
 //
-Result fs_umount_all_devices(void);
+bool fs_umount_all_devices(void);
 
 
 /*
 *   IPC functions
 */
+
+
+//
+bool fs_finalise_game_card_driver(FsDeviceOperator *d);
+
+//
+bool fs_set_speed_emulation_mode(FsDeviceOperator *d, uint32_t mode);
+
+//
+bool fs_get_speed_emulation_mode(FsDeviceOperator *d, uint32_t *mode);
+
+//
+bool fs_register_update_partition(void);
+
+//
+bool fs_open_registered_partition(FsFileSystem *fs);
+
+//
+bool fs_get_game_card_certificate(FsDeviceOperator *d, const FsGameCardHandle *handle, gamecard_cert_t *cert, size_t size);
+
+//
+bool fs_get_game_card_update_partition_info(FsDeviceOperator *d, const FsGameCardHandle *handle, gamecard_update_partition_info_t *info);
 
 
 #endif

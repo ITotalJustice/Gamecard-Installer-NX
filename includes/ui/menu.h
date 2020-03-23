@@ -45,11 +45,27 @@ bool init_menu(void);
 //
 void exit_menu(void);
 
+
+/*
+*
+*/
+
 //
 bool is_lower_key_gen_enabled(void);
 
 //
 bool is_bl_enabled(void);
+
+//
+void set_lower_key_gen(bool on);
+
+//
+void set_bl(bool on);
+
+
+/*
+*
+*/
 
 //
 void update_button_spin(void);
@@ -59,6 +75,9 @@ void ui_display_error_box(uint32_t err);
 
 //
 bool ui_display_yes_no_box(const char *message);
+
+// only enabled with DEBUG flag.
+bool ui_display_debug_box(const char * message, ...);
 
 //
 progress_bar_t *ui_init_progress_bar(const char *name, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining);

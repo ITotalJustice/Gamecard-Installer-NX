@@ -12,7 +12,7 @@
 typedef struct
 {
     uint8_t total;
-    nca_key_area_t *keak;
+    NcaKeyArea_t *keak;
 } keyz_t;
 
 bool g_has_keyz = false;
@@ -67,9 +67,17 @@ bool has_key_gen(uint8_t key_gen)
     return g_keyz.total - 1 >= key_gen;
 }
 
+#include "util/log.h"
+
 const uint8_t *get_keak(uint8_t key_gen)
 {
-    if (!has_keys() || !has_key_gen(key_gen)) return NULL; 
+    if (!has_keys() || !has_key_gen(key_gen)) return NULL;
+    write_log("\n keygen: %u got key: ", key_gen);
+    for (int i = 0; i < 0x10; i++)
+    {
+        write_log("%x", g_keyz.keak[key_gen].area[i]);
+    }
+    write_log("\n");
     return g_keyz.keak[key_gen].area;
 }
 
@@ -124,35 +132,16 @@ bool find_keys_file(char **out, size_t *out_size)
     return false;
 }
 
-/*
-* Code from nxdumptool. Many thanks.
-* https://github.com/DarkMatterCore/nxdumptool/blob/e475796676968b6d78cd2f4dce88403e0af7b58b/source/keys.c#L564
-*/
-char hextoi(char c)
+bool parse_hex_key(NcaKeyArea_t *keak, const char *hex, uint32_t len)
 {
-    if ('a' <= c && c <= 'f') return (c - 'a' + 0xA);
-    if ('A' <= c && c <= 'F') return (c - 'A' + 0xA);
-    if ('0' <= c && c <= '9') return (c - '0');
-    return 'Z';
-}
-
-bool parse_hex_key(nca_key_area_t *keak, const char *hex, uint32_t len)
-{
-    uint32_t _len = len * 2;
-    //if (!key || !hex || strlen(hex) < _len) return false;
-
-    char lowerU64[0x11]     = {0};
-    char upperU64[0x11]     = {0};
+    char lowerU64[0x11] = {0};
+    char upperU64[0x11] = {0};
     memcpy(lowerU64, hex, 16);
     memcpy(upperU64, hex + 16, 16);
     *(uint64_t *)keak->area = __bswap64(strtoul(lowerU64, NULL, 16));
     *(uint64_t *)(keak->area + 8) = __bswap64(strtoul(upperU64, NULL, 16));
-
     return true;;
 }
-/*
-* end of code from nxdumptool.
-*/
 
 bool parse_keys(void)
 {
@@ -192,19 +181,19 @@ bool parse_keys(void)
     if (st)
     {
         g_keyz.total = key_total;
-        g_keyz.keak = calloc(1, sizeof(nca_key_area_t) * key_total);
+        g_keyz.keak = calloc(1, sizeof(NcaKeyArea_t) * key_total);
 
         uint8_t skip = strlen(key_text) + 2 + 3;
         for (uint8_t i = 0; i < key_total; i++)
         {
             st += skip;
-            if (!parse_hex_key(&g_keyz.keak[i], st, sizeof(nca_key_area_t)))
+            if (!parse_hex_key(&g_keyz.keak[i], st, sizeof(NcaKeyArea_t)))
             {
                 g_keyz.total = i;
                 free(buf);
                 return false;
             }
-            st += (sizeof(nca_key_area_t) * 2) + 1;
+            st += (sizeof(NcaKeyArea_t) * 2) + 1;
         }
     }
     free(buf);

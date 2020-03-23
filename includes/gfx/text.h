@@ -13,6 +13,12 @@ typedef struct
     SDL_Rect rect;
     font_t *font;
     Colour colour;
+    struct
+    {
+        bool enabled;
+        int start_x;
+        int end_x;
+    } clip;
 } text_t;
 
 
@@ -24,6 +30,9 @@ void draw_text(text_t *text);
 
 //
 void draw_text_position(text_t *text, int x, int y);
+
+//
+void draw_text_right_align(text_t *text, int end_x, int y);
 
 //
 void draw_text_scale(text_t *text, int w, int h);

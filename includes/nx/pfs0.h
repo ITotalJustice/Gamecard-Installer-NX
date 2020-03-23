@@ -40,7 +40,7 @@ typedef struct
     uint64_t pfs0_offset;
     uint64_t pfs0_size;
     uint8_t _0x48[0xF0];
-} pfs0_superblock_t;
+} Pfs0Superblock_t;
 
 typedef struct
 {

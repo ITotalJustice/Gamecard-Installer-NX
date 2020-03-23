@@ -10,6 +10,6 @@ typedef struct
 {
     uint8_t _0x0[0x2]; //empty?
     ivfc_header_t ivfc_header;
-} romfs_superblock_t;
+} RomfsSuperblock_t;
 
 #endif

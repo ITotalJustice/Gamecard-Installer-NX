@@ -173,7 +173,7 @@ NsApplicationOccupiedSize ns_get_application_occupied_size(uint64_t app_id)
     return size;
 }
 
-Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, size_t data_size)
+Result ns_push_application_record(uint64_t app_id, const NcmContentStorageRecord *records, uint32_t count)
 {
     struct
     {
@@ -184,14 +184,14 @@ Result ns_push_application_record(uint64_t app_id, void *cnmt_storage_records, s
     
     Result rc =  serviceDispatchIn(&NS_APP_SERV, 16, in,
         .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_In },
-        .buffers = { { cnmt_storage_records, data_size } });
+        .buffers = { { records, sizeof(NcmContentStorageRecord) * count } });
 
     if (R_FAILED(rc))
         write_log("failed to push application record %08X\n", rc);
     return rc;
 }
 
-Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id, void *out_buf, size_t out_buf_size, uint32_t count)
+Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id, NcmContentStorageRecord *records, uint32_t count)
 {
     struct
     {
@@ -202,7 +202,7 @@ Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id,
 
     Result rc = serviceDispatchInOut(&NS_APP_SERV, 17, in, out,
         .buffer_attrs = { SfBufferAttr_HipcMapAlias | SfBufferAttr_Out },
-        .buffers = { { out_buf, out_buf_size } });
+        .buffers = { { records, sizeof(NcmContentStorageRecord) * count } });
 
     if (R_FAILED(rc))
         write_log("failed to list app cnmt\n");
@@ -217,13 +217,41 @@ Result ns_delete_application_record(uint64_t app_id)
     return rc;
 }
 
-int32_t ns_count_application_content_meta(uint64_t app_id) // need a function to check if it has at least 1 content meta, currently will fail if non exists.
+int32_t ns_count_application_content_meta(uint64_t app_id)
 {
     int32_t count = 0;
     Result rc = nsCountApplicationContentMeta(app_id, &count);
+
+    if (rc == 0x410)    // not an error. Just means no cnmt found.
+    {
+        return 0;
+    }
+
     if (R_FAILED(rc))
+    {
         write_log("failed to count app cnmt\n");
+        return 0;
+    }
+
     return count;
+}
+
+#include <string.h>
+bool ns_get_gamecard_info(gamecard_info_t *info)
+{
+    struct
+    {
+        uint8_t d[0x10];
+    } out;
+
+    Result rc = serviceDispatchOut(&NS_APP_SERV, 46, out);
+    if (R_FAILED(rc))
+    {
+        write_log("Failed to get gamecard info\n");
+        return false;
+    }
+    memcpy(info, &out, 0x10);
+    return true;
 }
 
 bool ns_has_application_record(uint64_t app_id) //5.0.0

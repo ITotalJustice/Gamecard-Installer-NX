@@ -49,7 +49,7 @@ typedef enum
     NcaContentType_Control      = 0x2,
     NcaContentType_Manual       = 0x3,
     NcaContentType_Data         = 0x4,
-    NcaContentType_PublicData   = 0x5
+    NcaContentType_PublicData   = 0x5,
 } NcaContentType;
 
 typedef enum
@@ -88,12 +88,14 @@ typedef enum
 
 typedef enum
 {
-    NcaHashType_PFS0    = 0x2,
-    NcaHashType_RomFS   = 0x3
+    NcaHashType_Auto                    = 0x0,
+    NcaHashType_HierarchicalSha256      = 0x2,
+    NcaHashType_HierarchicalIntegrity   = 0x3
 } NcaHashType;
 
 typedef enum
 {
+    NcaEncryptionType_Auto      = 0x0,
     NcaEncryptionType_None      = 0x1,
     NcaEncryptionType_AesCtrOld = 0x2,
     NcaEncryptionType_AesCtr    = 0x3,
@@ -124,7 +126,7 @@ typedef struct
     uint32_t media_end_offset;   // divided by 0x200.
     uint32_t _0x8;               // unkown.
     uint32_t _0xC;               // unkown.
-} nca_section_table_entry_t;
+} NcaSectionTableEntry_t;
 
 typedef struct
 {
@@ -132,11 +134,18 @@ typedef struct
     uint8_t fs_type;            // see NcaFileSystemType.
     uint8_t hash_type;          // see NcaHashType.
     uint8_t encryption_type;    // see NcaEncryptionType.
-    uint8_t _0x5[0x3];          // empty.
+    uint8_t _0x5[0x1];          // empty.
+
+    uint8_t hash[0x20];
+    uint32_t block_size;
+    uint8_t always_2[0x4];
+    uint64_t hash_table_offset;
+    uint64_t hash_table_size;
+    
     union
     {
-        pfs0_superblock_t pfs0_sb;
-        romfs_superblock_t romfs_sb;
+        Pfs0Superblock_t pfs0_sb;
+        RomfsSuperblock_t romfs_sb;
         // anything else?????
     };
     union
@@ -149,22 +158,22 @@ typedef struct
         };
     };
     uint8_t _0x148[0xB8];       // empty.
-} nca_section_header_t;
+} NcaFsHeader_t;
 
 typedef struct
 {
     uint8_t sha256[0x20];
-} nca_section_header_hash_t;
+} NcaSectionHeaderHash_t;
 
 typedef struct
 {
     uint8_t area[0x10];
-} nca_key_area_t;
+} NcaKeyArea_t;
 
 typedef struct
 {
     uint8_t rights_id[0x10];
-} rights_id_t;
+} RightsId_t;
 
 typedef struct
 {
@@ -180,21 +189,43 @@ typedef struct
     uint32_t context_id;
     uint32_t sdk_version;
     uint8_t key_gen;                // see NcaKeyGeneration.
-    uint8_t _0x221[0xF];            // empty.
-    rights_id_t rights_id;
+    uint8_t header_1_sig_key_gen;
+    uint8_t _0x221[0xE];            // empty.
+    RightsId_t rights_id;
 
-    nca_section_table_entry_t section_table[0x4];
-    nca_section_header_hash_t section_header_hash[0x4];
-    nca_key_area_t key_area[0x4];
+    NcaSectionTableEntry_t section_table[0x4];
+    NcaSectionHeaderHash_t section_header_hash[0x4];
+    NcaKeyArea_t key_area[0x4];
 
     uint8_t _0x340[0xC0];           // empty.
 
-    nca_section_header_t section_header[0x4];
-} nca_header_t;
+    NcaFsHeader_t section_header[0x4];
+} NcaHeader_t;
 
 
 //
 bool nca_check_if_magic_valid(uint32_t magic);
+
+//
+const char *nca_get_magic_string(uint32_t magic);
+
+//
+const char *nca_get_distribution_type_string(NcaDistributionType type);
+
+//
+const char *nca_get_content_type_string(NcaContentType type);
+
+//
+const char *nca_get_keak_index_string(NcaKeyAreaEncryptionKeyIndex index);
+
+//
+const char *nca_get_file_system_type_string(NcaFileSystemType type);
+
+//
+const char *nca_get_hash_type_string(NcaHashType type);
+
+//
+const char *nca_get_encryption_type_string(NcaEncryptionType type);
 
 //
 const char *nca_return_key_gen_string(uint8_t key_gen);
@@ -206,7 +237,7 @@ uint16_t nca_return_key_gen_int(uint8_t key_gen);
 bool nca_check_key_gen(uint8_t key_gen);
 
 //
-const char *nca_get_string_from_id(NcmContentId nca_id, char *out);
+const char *nca_get_string_from_id(NcmContentId *nca_id, char *out);
 
 //
 NcmContentId nca_get_id_from_string(const char *nca_in_string);
@@ -217,19 +248,19 @@ NcmContentId nca_get_id_from_string(const char *nca_in_string);
 */
 
 //
-//bool nca_decrypt_key_area(const nca_header_t *header, nca_key_area_t *out);
+//bool nca_decrypt_key_area(const NcaHeader_t *header, NcaKeyArea_t *out);
 
 //
-void nca_encrypt_header(nca_header_t *header);
+bool nca_encrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header);
 
 //
-void nca_decrypt_header(nca_header_t *header);
+bool nca_decrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header);
 
 //
-bool nca_get_header(FILE *fp, uint64_t offset, nca_header_t *header);
+bool nca_get_header(FILE *fp, uint64_t offset, NcaHeader_t *header);
 
 //
-bool nca_get_header_decrypted(FILE *fp, uint64_t offset, nca_header_t *header);
+bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header);
 
 
 
@@ -244,9 +275,9 @@ int nca_read(void *in);
 int nca_write(void *in);
 
 //
-bool nca_setup_placeholder(ncm_install_struct_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
+bool nca_setup_placeholder(NcmInstall_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
 
 //
-bool nca_start_install(NcmContentId content_id, NcmStorageId storage_id);
+bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id);
 
 #endif

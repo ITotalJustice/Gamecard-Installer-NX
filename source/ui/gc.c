@@ -25,6 +25,8 @@ typedef struct
 {
     char cnmt[0x30];
     uint64_t title_id;
+    size_t size;
+    uint8_t key_gen;
 } gc_cnmt_t;
 
 
@@ -40,7 +42,7 @@ uint8_t g_curr_game = 0;
 
 bool init_gc(void)
 {
-    if (R_FAILED(fs_open_device_operator(&g_dop)))
+    if (!fs_open_device_operator(&g_dop))
     {
         write_log("failed to mount gcop\n");
         ui_display_error_box(ErrorCode_Init_Gc);
@@ -61,9 +63,9 @@ bool poll_gc(void)
     return fs_is_gamecard_inserted(&g_dop);
 }
 
-bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
+bool setup_gamecard(GameCard_t *gamecard, gc_cnmt_t *gc_cnmt)
 {
-    struct dirent *d = NULL;
+    struct dirent *d = {0};
     DIR *dir = open_dir(".");
     if (!dir)
     {
@@ -86,13 +88,15 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
         }
 
         // get the nca header, decrypt it to get the nca size.
-        nca_header_t header = {0};
+        NcaHeader_t header = {0};
         nca_get_header_decrypted(fp, 0, &header);
         fclose(fp);
 
         // check if this file belongs to this cnmt.
         if (header.title_id != gc_cnmt->title_id)
+        {
             continue;
+        }
 
         // add the size of the nca.
         gamecard->size += header.size;
@@ -104,8 +108,9 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
             // get the app_id.
             gamecard->app_id = ncm_get_app_id_from_title_id(header.title_id, NcmContentMetaType_Application);
             gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
-            gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(header.key_gen ? header.key_gen : header.old_key_gen));
-            strcpy(gamecard->cnmt_name, d->d_name);
+            gamecard->key_gen = header.key_gen ? header.key_gen : header.old_key_gen;
+            gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(gamecard->key_gen));
+            strncpy(gamecard->cnmt_name, d->d_name, 0x100);
             
             NsApplicationControlData control_data = {0};
             if (ns_get_app_control_data(&control_data, gamecard->app_id))
@@ -119,6 +124,7 @@ bool setup_gamecard(gamecard_t *gamecard, gc_cnmt_t *gc_cnmt)
 
     gamecard->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 585, Colour_Nintendo_White, "Size: %.2fGB", (float)gamecard->size / 0x40000000);
     closedir(dir);
+
     return true;
 }
 
@@ -151,12 +157,13 @@ bool save_cnmt_path(void)
             }
 
             // get the nca header, decrypt it to get the nca size.
-            nca_header_t header = {0};
+            NcaHeader_t header = {0};
             nca_get_header_decrypted(fp, 0, &header);
             fclose(fp);
 
             // save the cnmt info.
             gc_cnmt[i].title_id = header.title_id;
+            gc_cnmt[i].size = header.size;
             strcpy(gc_cnmt[i].cnmt, d->d_name);
             i++;
         }
@@ -164,22 +171,22 @@ bool save_cnmt_path(void)
     return true;
 }
 
-bool mount_gc(gamecard_t *gamecard)
+bool mount_gc(GameCard_t *gamecard)
 {
-    if (R_FAILED(fs_get_gamecard_handle_from_device_operator(&g_dop, &g_gc_handle)))
+    if (!fs_get_gamecard_handle_from_device_operator(&g_dop, &g_gc_handle))
     {
         write_log("failed to get gc handle\n");
         ui_display_error_box(ErrorCode_Mount_Handle);
         return false;
     }
 
-    if (!fs_mount_gamecard_partition(g_gc_mount_path, g_gc_handle, FsGameCardPartition_Secure))
+    if (!fs_mount_gamecard_partition(g_gc_mount_path, &g_gc_handle, FsGameCardPartition_Secure))
     {
         write_log("failed to mount gc\n");
         ui_display_error_box(ErrorCode_Mount_Partition);
         return false;
     }
-    
+
     if (!change_dir("%s%s", g_gc_mount_path, ":/"))
     {
         write_log("failed to change path to gc\n");
@@ -208,18 +215,20 @@ bool mount_gc(gamecard_t *gamecard)
     return setup_gamecard(gamecard, &gc_cnmt[g_curr_game]);
 }
 
-void swap_game_in_gc(gamecard_t *gamecard)
+void swap_game_in_gc(GameCard_t *gamecard)
 {
     // theres no need to swap if theres only one game in the gc.
     if (g_cnmt_total == 1)
+    {
         return;
+    }
     
     reset_gc(gamecard);
     g_curr_game = g_cnmt_total == (g_curr_game + 1) ? 0 : g_curr_game + 1;
     setup_gamecard(gamecard, &gc_cnmt[g_curr_game]);
 }
 
-void reset_gc(gamecard_t *gamecard)
+void reset_gc(GameCard_t *gamecard)
 {
     free_image(gamecard->icon);
     free_text(gamecard->title);
@@ -227,10 +236,10 @@ void reset_gc(gamecard_t *gamecard)
     free_text(gamecard->text_size);
     free_text(gamecard->text_key_gen);
     free_text(gamecard->text_app_id);
-    memset(gamecard, 0, sizeof(gamecard_t));
+    memset(gamecard, 0, sizeof(GameCard_t));
 }
 
-bool unmount_gc(gamecard_t *gamecard)
+bool unmount_gc(GameCard_t *gamecard)
 {
     fs_close_gamecard_handle(&g_gc_handle);
     fs_unmount_device(g_gc_mount_path);
@@ -239,11 +248,14 @@ bool unmount_gc(gamecard_t *gamecard)
     memset(gc_cnmt, 0, sizeof(gc_cnmt_t));
     reset_gc(gamecard);
     change_dir("sdmc:/");
+    fs_close_device_operator(&g_dop);
+    fs_open_device_operator(&g_dop);
     return true;
 }
 
 #include "nx/crypto.h"
-bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
+#include "nx/lbl.h"
+bool install_gc(GameCard_t *gamecard, NcmStorageId storage_id)
 {
     if (!gamecard)
     {
@@ -258,8 +270,15 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         ui_display_error_box(ErrorCode_Install_Storage);
         return false;
     }
+    
+    if (ns_get_storage_free_space(storage_id) <= gamecard->size)
+    {
+        write_log("not enough free space.\n");
+        ui_display_error_box(ErrorCode_Install_NoSpace);
+        return false;
+    }
 
-    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen) && !is_lower_key_gen_enabled())
+    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen ? gamecard->key_gen - 1 : gamecard->key_gen) && !is_lower_key_gen_enabled())
     {
         if (!has_keys() || !has_key_gen(gamecard->key_gen) || !ui_display_yes_no_box("The game has a higher keygen. Enable lower keygen?"))
         {
@@ -268,14 +287,12 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
             return false;
         }
 
-        //enable
+        set_lower_key_gen(true);
     }
 
-    if (ns_get_storage_free_space(storage_id) <= gamecard->size)
+    if (!is_bl_enabled())
     {
-        write_log("not enough free space.\n");
-        ui_display_error_box(ErrorCode_Install_NoSpace);
-        return false;
+        disable_backlight(BacklightFade_Slow);
     }
 
     if (R_FAILED(appletSetMediaPlaybackState(true)))
@@ -283,8 +300,10 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         write_log("couldnt set media playback state\n");
     }
 
+    write_log("getting content id from cmnt name\n");
     NcmContentId content_id = nca_get_id_from_string(gamecard->cnmt_name);
-    if (!nca_start_install(content_id, storage_id))
+
+    if (!nca_start_install(&content_id, storage_id))
     {
         write_log("failed to install nca\n");
         ui_display_error_box(ErrorCode_Install_CnmtNca);
@@ -292,12 +311,9 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
-    // the cnmt install is old code from yati (aka its very bad).
-    cnmt_struct_t cnmt = {0};
-    cnmt.cnmt_info.content_id = content_id;
-    cnmt.storage_id = storage_id;
+    CnmtContentInfos_t infos = {0};
 
-    if (R_FAILED(cnmt_open(&cnmt, get_file_size(gamecard->cnmt_name))))
+    if (!cnmt_open(&content_id, storage_id, &infos))
     {
         write_log("failed to install cnmt\n");
         ui_display_error_box(ErrorCode_Install_Cnmt);
@@ -305,19 +321,25 @@ bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id)
         return false;
     }
 
-    for (uint32_t i = 1; appletMainLoop() && i < cnmt.total_cnmt_infos; i++)
+    for (uint16_t i = 1; i < infos.info_count; i++)
     {
-        if (!nca_start_install(cnmt.cnmt_infos[i].content_id, storage_id))
+        if (!nca_start_install(&infos.content_infos[i].content_id, storage_id))
         {
             write_log("failed to install nca\n");
             ui_display_error_box(ErrorCode_Install_Nca);
-            free(cnmt.cnmt_infos);
+            free(infos.content_infos);
             appletSetMediaPlaybackState(false);
             return false;
         }
     }
     
-    free(cnmt.cnmt_infos);
+    free(infos.content_infos);
+
     appletSetMediaPlaybackState(false);
+    if (!is_bl_enabled())
+    {
+        enable_backlight(BacklightFade_Fast);
+    }
+
     return true;
 }

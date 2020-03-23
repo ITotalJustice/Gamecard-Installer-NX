@@ -22,7 +22,7 @@ typedef struct
     uint64_t app_id;
     uint8_t key_gen;
     size_t size;
-} gamecard_t;
+} GameCard_t;
 
 
 //
@@ -35,18 +35,18 @@ void exit_gc(void);
 bool poll_gc(void);
 
 //
-bool mount_gc(gamecard_t *gamecard);
+bool mount_gc(GameCard_t *gamecard);
 
 //
-void reset_gc(gamecard_t *gamecard);
+void reset_gc(GameCard_t *gamecard);
 
 //
-bool unmount_gc(gamecard_t *gamecard);
+bool unmount_gc(GameCard_t *gamecard);
 
 //
-void swap_game_in_gc(gamecard_t *gamecard);
+void swap_game_in_gc(GameCard_t *gamecard);
 
 //
-bool install_gc(gamecard_t *gamecard, NcmStorageId storage_id);
+bool install_gc(GameCard_t *gamecard, NcmStorageId storage_id);
 
 #endif

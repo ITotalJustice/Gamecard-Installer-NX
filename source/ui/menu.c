@@ -16,6 +16,7 @@
 #include "nx/ns.h"
 #include "nx/ncm.h"
 #include "nx/input.h"
+#include "nx/lbl.h"
 
 
 #define TITLE_NAME      "GameCard Installer"
@@ -57,19 +58,21 @@ typedef struct
     text_t *title;
     text_t *a_text;
     text_t *b_text;
+    text_t *y_text;
     button_t *a_button;
     button_t *b_button;
+    button_t *y_button;
     button_t *app_icon;
-} background_t;
-background_t g_background = {0};
+} Background_t;
+Background_t g_background = {0};
 
 typedef struct
 {
     text_t *text;
     bool selected;
     bool avaliable;
-} options_t;
-options_t g_options[3] = {0};
+} Options_t;
+Options_t g_options[3] = {0};
 
 // sound effects.
 typedef struct
@@ -78,8 +81,8 @@ typedef struct
     sound_t *insert;
     sound_t *move;
     sound_t *popup;
-} sound_effects_t;
-sound_effects_t g_sound_effects = {0};
+} SoundEffects_t;
+SoundEffects_t g_sound_effects = {0};
 
 // for colour pulsing boxes.
 typedef struct
@@ -87,13 +90,13 @@ typedef struct
     SDL_Colour col;
     bool increase_blue;
     uint8_t delay;
-} pulse_colour_t;
+} PulseColour_t;
 
 typedef struct
 {
-    pulse_colour_t pulse;
+    PulseColour_t pulse;
     SDL_Rect rect;
-} pulsing_shape_t;
+} PulseShape_t;
 
 typedef struct
 {
@@ -103,13 +106,13 @@ typedef struct
     shape_t bar;
     shape_t filled;
     text_t *space_text;
-} storage_t;
+} Storage_t;
 
-storage_t g_nand_storage = {0};
-storage_t g_sd_storage = {0};
+Storage_t g_nand_storage = {0};
+Storage_t g_sd_storage = {0};
 
 // the gamecard struct that will contain info on the gc, as well as gfx data.
-gamecard_t gamecard = {0};
+GameCard_t gamecard = {0};
 
 // the default icon that is rendered if no gamecard is inserted.
 image_t *g_empty_icon = {0};
@@ -146,8 +149,10 @@ void setup_background(void)
     // buttons.
     g_background.a_button = create_button(&FONT_BUTTON[QFontSize_25], 1150, 675, Colour_Nintendo_White, Font_Button_A);
     g_background.b_button = create_button(&FONT_BUTTON[QFontSize_25], 1055 - 35, 675, Colour_Nintendo_White, Font_Button_B);
+    g_background.y_button = create_button(&FONT_BUTTON[QFontSize_25], 870, 675, Colour_Nintendo_White, Font_Button_Y);
     g_background.a_text = create_text(&FONT_TEXT[QFontSize_20], 1185, 675, Colour_Nintendo_White, "OK");
     g_background.b_text = create_text(&FONT_TEXT[QFontSize_20], 1055, 675, Colour_Nintendo_White, "Back");
+    g_background.y_text = create_text(&FONT_TEXT[QFontSize_20], 905, 675, Colour_Nintendo_White, "Settings");
 }
 
 void setup_options(void)
@@ -199,8 +204,10 @@ void free_background(void)
     free_button(g_background.app_icon);
     free_button(g_background.a_button);
     free_button(g_background.b_button);
+    free_button(g_background.y_button);
     free_text(g_background.a_text);
     free_text(g_background.b_text);
+    free_text(g_background.y_text);
 }
 
 void free_options(void)
@@ -235,7 +242,7 @@ void free_tetris(void)
 
 bool init_menu(void)
 {
-    ncm_delete_all_placeholders();
+    ncm_delete_all_placeholders_id();
 
     // romfs will contain the empty icon and sound effects.
     if (R_FAILED(romfsInit()))
@@ -339,7 +346,7 @@ void update_gamecard(void)
     }
 }
 
-void update_pulse_colour(pulse_colour_t *pulse)
+void update_pulse_colour(PulseColour_t *pulse)
 {
     if (pulse->col.g == 255) pulse->increase_blue = true;
     else if (pulse->col.b == 255 && pulse->delay == 10)
@@ -380,8 +387,10 @@ void ui_display_background(void)
     // buttons
     draw_button(g_background.a_button);
     draw_button(g_background.b_button);
+    draw_button(g_background.y_button);
     draw_text(g_background.a_text);
     draw_text(g_background.b_text);
+    draw_text(g_background.y_text);
 }
 
 void ui_display_storage_size(void)
@@ -395,7 +404,7 @@ void ui_display_storage_size(void)
     
 }
 
-pulsing_shape_t g_options_pulse_bar = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
+PulseShape_t g_options_pulse_bar = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
 void ui_display_option_list(void)
 {
     for (uint8_t i = 0; i < 3; i++)
@@ -468,13 +477,23 @@ bool is_bl_enabled(void)
     return g_enable_bl;
 }
 
+void set_lower_key_gen(bool on)
+{
+    g_lower_key_gen = on;
+}
+
+void set_bl(bool on)
+{
+    g_enable_bl = on;
+}
+
 void ui_draw_spacers(int x, int y, int txt_size)
 {
     SDL_DrawShape(Colour_Nintendo_Silver, x - 25, y-18, 500 + 50, 1, true);
     SDL_DrawShape(Colour_Nintendo_Silver, x - 25, y+txt_size+18, 500 + 50, 1, true);
 }
 
-void ui_draw_highlight_box(pulsing_shape_t *pulse_shape, int x, int y, int w, int h)
+void ui_draw_highlight_box(PulseShape_t *pulse_shape, int x, int y, int w, int h)
 {
     SDL_DrawShapeOutlineEX(pulse_shape->pulse.col.r, pulse_shape->pulse.col.g, pulse_shape->pulse.col.b, pulse_shape->pulse.col.a, x - 20, y - 20, w, h + 20, 5);
     update_pulse_colour(&pulse_shape->pulse);
@@ -487,7 +506,7 @@ void ui_display_options_sub_menu(void)
 
 void ui_display_options(void)
 {
-    pulsing_shape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
+    PulseShape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
     
     const char *expl_keygen[] =
     {
@@ -714,7 +733,7 @@ bool ui_display_yes_no_box(const char *message)
 {
     uint8_t cursor = 1;
     bool flag = false;
-    pulsing_shape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
+    PulseShape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
 
     while (appletMainLoop())
     {
@@ -764,8 +783,27 @@ bool ui_display_yes_no_box(const char *message)
     return flag;
 }
 
+#define DEBUG
+bool ui_display_debug_box(const char * message, ...)
+{
+    #ifdef DEBUG
+    char full_text[0x100] = {0};
+    va_list v;
+    va_start(v, message);
+    vsnprintf(full_text, 0x100, message, v);
+    va_end(v);
+
+    return ui_display_yes_no_box(full_text);
+    #endif
+    return true;
+}
 void ui_display_error_box(uint32_t err)
 {
+    if (!is_backlight_enabled())
+    {
+        enable_backlight(BacklightFade_Instant);
+    }
+
     // play the error sound effect.
     play_sound(g_sound_effects.error, -1, 0);
     
@@ -833,6 +871,8 @@ void ui_free_progress_bar(progress_bar_t *p_bar)
 
 void ui_update_progress_bar(progress_bar_t *p_bar, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining)
 {
+    if (!p_bar) return;
+
     // shapes.
     p_bar->filled_bar.info.rect.w = ((float)done / (float)remaining) * p_bar->empty_bar.info.rect.w;
 
@@ -850,6 +890,8 @@ void ui_update_progress_bar(progress_bar_t *p_bar, uint64_t speed, uint16_t eta_
 
 void ui_display_progress_bar(progress_bar_t *p_bar)
 {
+    //write_log("drawing bar\n");
+
     // display the popup box.
     ui_display_popup_box();
 
@@ -859,7 +901,8 @@ void ui_display_progress_bar(progress_bar_t *p_bar)
     draw_text(p_bar->text_warning2);
 
     // game icon and speed.
-    draw_image_set(gamecard.icon, 320, 200, gamecard.icon->rect.w / 2, gamecard.icon->rect.h / 2);
+    if (gamecard.icon)
+        draw_image_set(gamecard.icon, 320, 200, gamecard.icon->rect.w / 2, gamecard.icon->rect.h / 2);
     draw_text(p_bar->text_speed);
     draw_text(p_bar->text_name);
     draw_text(p_bar->text_time);
