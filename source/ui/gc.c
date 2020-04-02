@@ -635,21 +635,24 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
     }
 
     out_info->app_id = ncm_get_app_id_from_title_id(GAMECARD.entries[game_pos].base[0].cnmt.key.id, GAMECARD.entries[game_pos].base[0].cnmt.key.type);
-    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
+    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
     enable_text_clip(out_info->text_app_id, 0, 325);
     out_info->key_gen = GAMECARD.entries[game_pos].base[0].key_gen;
-    out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
+    out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 535, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
     enable_text_clip(out_info->text_key_gen, 0, 325);
-    out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 585, Colour_Nintendo_White, "Size: %.2fGB", (float)GAMECARD.entries[game_pos].total_size / 0x40000000);
+    out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 575, Colour_Nintendo_White, "Size: %.2fGB", (float)GAMECARD.entries[game_pos].total_size / 0x40000000);
     enable_text_clip(out_info->text_size, 0, 325);
+    out_info->text_entry_contents = create_text(&FONT_TEXT[QFontSize_18], 50, 615, Colour_Nintendo_White, "Base: %u Upp: %u DLC: %u", GAMECARD.entries[game_pos].base_count, GAMECARD.entries[game_pos].upp_count, GAMECARD.entries[game_pos].dlc_count);
+    enable_text_clip(out_info->text_entry_contents, 0, 325);
 
+    // TODO: manually parse the control.nacp if this fails.
     NsApplicationControlData control_data = {0};
     if (ns_get_app_control_data(&control_data, out_info->app_id))
     {
         out_info->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
-        out_info->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
+        out_info->title = create_text(&FONT_TEXT[QFontSize_18], 50, 415, Colour_Nintendo_White, control_data.nacp.lang[0].name);
         enable_text_clip(out_info->title, 0, 325);
-        out_info->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
+        out_info->author = create_text(&FONT_TEXT[QFontSize_18], 50, 455, Colour_Nintendo_White, control_data.nacp.lang[0].author);
         enable_text_clip(out_info->author, 0, 325);
     }
     return true;
@@ -815,7 +818,7 @@ bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
             write_log("failed to open: %s\n", nca_name_buffer);
             return false;
         }
-        if (!nca_start_install(&entry->cnmt.content_infos[i].content_id, 0, storage_id, fp))
+        if (!nca_start_install(nca_name_buffer, &entry->cnmt.content_infos[i].content_id, 0, storage_id, fp))
         {
             write_log("failed to install: %s\n", nca_name_buffer);
             fclose(fp);

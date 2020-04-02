@@ -64,10 +64,14 @@ typedef struct
     text_t *text_app_id;
     text_t *text_key_gen;
     text_t *text_size;
+    text_t *text_entry_contents;
 
     uint64_t app_id;
     uint8_t key_gen;
     size_t size;
+    uint16_t base_count;
+    uint16_t upp_count;
+    uint16_t dlc_count;
 } GameInfo_t;
 
 

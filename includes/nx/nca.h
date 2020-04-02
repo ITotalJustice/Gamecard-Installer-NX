@@ -248,7 +248,7 @@ bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header);
 bool nca_setup_placeholder(NcmInstall_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
 
 //
-bool nca_start_install(NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp);
+bool nca_start_install(const char *name, const NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp);
 
 
 /*

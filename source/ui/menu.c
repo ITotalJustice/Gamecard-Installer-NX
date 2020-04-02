@@ -248,6 +248,7 @@ void free_game_info(GameInfo_t *game_info)
     free_text(game_info->text_size);
     free_text(game_info->text_key_gen);
     free_text(game_info->text_app_id);
+    free_text(game_info->text_entry_contents);
     memset(game_info, 0, sizeof(GameInfo_t));
 }
 
@@ -452,6 +453,7 @@ void ui_display_gamecard(void)
         draw_text(g_game_info.text_size);
         draw_text(g_game_info.text_key_gen);
         draw_text(g_game_info.text_app_id);   
+        draw_text(g_game_info.text_entry_contents);
     }
 }
 
@@ -560,7 +562,9 @@ void ui_display_options(void)
 
         if (input.down & KEY_B)
         {
-            break;
+            if (left_column)
+                break;
+            left_column = true;
         }
 
         else if (input.down & KEY_LEFT)
@@ -599,7 +603,7 @@ void ui_display_options(void)
 
         else if (input.down & KEY_A)
         {
-            if (cursor == 3 && left_column) break;
+            if (cursor == 2 && left_column) break;
             if (left_column) left_column = !left_column;
             else
             {
@@ -749,6 +753,10 @@ void ui_display_options(void)
                 }
                 break;
             }
+            case 2:
+            {
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 135, Colour_Nintendo_BrightSilver, "Exit the settings menu.");
+            }
             default:
             {
                 break;
@@ -864,7 +872,7 @@ progress_bar_t *ui_init_progress_bar(const char *name, uint64_t speed, uint16_t 
     p_bar->text_warning1 = create_text(&FONT_TEXT[QFontSize_20], 500, 260, Colour_Nintendo_BrightSilver, "Please do not remove the gamecard or");
     p_bar->text_warning2 = create_text(&FONT_TEXT[QFontSize_20], 500, 295, Colour_Nintendo_BrightSilver, "power off the system whilst installing.");
     p_bar->text_speed = create_text(&FONT_TEXT[QFontSize_20], 325, 360, Colour_Nintendo_White, "%.2f MiB/s", speed);
-    p_bar->text_name = create_text(&FONT_TEXT[QFontSize_20], 410, 420, Colour_Nintendo_White, "%s.nca", name);
+    p_bar->text_name = create_text(&FONT_TEXT[QFontSize_20], 410, 420, Colour_Nintendo_White, "%s", name);
     p_bar->text_time = create_text(&FONT_TEXT[QFontSize_20], prog_bar.x + 85, prog_bar.y + 40, Colour_Nintendo_White, "%d %s %d seconds remaining", eta_min, eta_min != 1 ? "minutes" : "minute", eta_sec);
 
     // vars.

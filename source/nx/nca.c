@@ -436,7 +436,7 @@ int nca_write(void *in)
     return 0;
 }
 
-bool nca_setup_placeholder_id(NcmInstall_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id)
+bool nca_setup_placeholder_id(NcmInstall_t *out, size_t size, const NcmContentId *content_id, NcmStorageId storage_id)
 {
     // open ncm storage.
     if (!ncm_open_storage(&out->storage, storage_id))
@@ -620,9 +620,9 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
     return true;
 }
 
-bool nca_start_install(NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp)
+bool nca_start_install(const char *name, const NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp)
 {
-    if (!content_id || !fp)
+    if (!content_id || !fp || !name)
     {
         write_log("missing params in %s\n", __func__);
         return false;
@@ -738,7 +738,7 @@ bool nca_start_install(NcmContentId *content_id, uint64_t offset, NcmStorageId s
     uint8_t eta_sec = 0;
 
     // init the progress bar.
-    progress_bar_t *p_bar = ui_init_progress_bar("nca string here", speed, eta_min, eta_sec, nca.data_written, nca.total_size);
+    progress_bar_t *p_bar = ui_init_progress_bar(name, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
     if (!p_bar)
     {
         write_log("Failed to init progress bar!\n");
