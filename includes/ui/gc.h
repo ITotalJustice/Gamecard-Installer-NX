@@ -34,12 +34,14 @@ typedef struct
 typedef struct
 {
     uint8_t key_gen;
+    uint64_t size;
     Cnmt_t cnmt;
 } GameCardEntry_t;
 
 typedef struct
 {
     uint64_t total_size;
+    uint32_t total_count;
     uint16_t base_count;    // should always be 1.
     uint16_t upp_count;     // i'm not sure if games can come with multiple updates for the same game, wouldn't make sense. This is here for compatibilty should that happen.
     uint16_t dlc_count;     // games can come bundled with multiple dlc.
@@ -77,6 +79,7 @@ uint16_t gc_get_current_dlc_count(void);
 
 //
 bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos);
+bool gc_setup_detailed_game_info(GameInfoDetailed_t *info_out, uint16_t entry);
 bool gc_next_game(GameInfo_t *info_out);
 bool gc_prev_game(GameInfo_t *info_out);
 bool gc_change_game(GameInfo_t *info_out, uint16_t game_pos);

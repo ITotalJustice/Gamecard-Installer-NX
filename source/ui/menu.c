@@ -41,7 +41,7 @@ typedef enum
 const char *g_option_list[] =
 {
     "Nand Install",
-    "Sd Card Install",
+    "SD Card Install",
     "Exit",
 };
 
@@ -64,9 +64,13 @@ typedef struct
     text_t *title;
     text_t *a_text;
     text_t *b_text;
+    text_t *x_text;
     text_t *y_text;
+    text_t *l_text;
+    text_t *r_text;
     button_t *a_button;
     button_t *b_button;
+    button_t *x_button;
     button_t *y_button;
     button_t *l_button;
     button_t *r_button;
@@ -143,10 +147,12 @@ void setup_background(void)
     // buttons.
     g_background.a_button = create_button(&FONT_BUTTON[QFontSize_25], 1150, 675, Colour_Nintendo_White, Font_Button_A);
     g_background.b_button = create_button(&FONT_BUTTON[QFontSize_25], 1055 - 35, 675, Colour_Nintendo_White, Font_Button_B);
-    g_background.y_button = create_button(&FONT_BUTTON[QFontSize_25], 870, 675, Colour_Nintendo_White, Font_Button_Y);
+    g_background.x_button = create_button(&FONT_BUTTON[QFontSize_25], 870, 675, Colour_Nintendo_White, Font_Button_X);
+    g_background.y_button = create_button(&FONT_BUTTON[QFontSize_25], 700, 675, Colour_Nintendo_White, Font_Button_Y);
     g_background.a_text = create_text(&FONT_TEXT[QFontSize_20], 1185, 675, Colour_Nintendo_White, "OK");
     g_background.b_text = create_text(&FONT_TEXT[QFontSize_20], 1055, 675, Colour_Nintendo_White, "Back");
-    g_background.y_text = create_text(&FONT_TEXT[QFontSize_20], 905, 675, Colour_Nintendo_White, "Settings");
+    g_background.x_text = create_text(&FONT_TEXT[QFontSize_20], 905, 675, Colour_Nintendo_White, "Settings");
+    g_background.y_text = create_text(&FONT_TEXT[QFontSize_20], 735, 675, Colour_Nintendo_White, "Game Info");
 }
 
 void setup_options(void)
@@ -198,9 +204,11 @@ void free_background(void)
     free_button(g_background.app_icon);
     free_button(g_background.a_button);
     free_button(g_background.b_button);
+    free_button(g_background.x_button);
     free_button(g_background.y_button);
     free_text(g_background.a_text);
     free_text(g_background.b_text);
+    free_text(g_background.x_text);
     free_text(g_background.y_text);
 }
 
@@ -250,6 +258,31 @@ void free_game_info(GameInfo_t *game_info)
     free_text(game_info->text_app_id);
     free_text(game_info->text_entry_contents);
     memset(game_info, 0, sizeof(GameInfo_t));
+}
+
+void free_game_info_detailed(GameInfoDetailed_t *info)
+{
+    if (!info)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    free_text(info->text_type);
+    free_text(info->text_id);
+    free_text(info->text_keygen);
+    free_text(info->text_version);
+    free_text(info->text_content_count);
+    free_text(info->text_content_meta_count);
+
+    for (uint16_t i = 0; i < info->content_count; i++)
+    {
+        free_text(info->entry[i].name);
+        free_text(info->entry[i].type);
+        free_text(info->entry[i].size);
+    }
+
+    memset(info, 0, sizeof(GameInfoDetailed_t));
 }
 
 bool init_menu(void)
@@ -408,9 +441,11 @@ void ui_display_background(void)
     // buttons
     draw_button(g_background.a_button);
     draw_button(g_background.b_button);
+    draw_button(g_background.x_button);
     draw_button(g_background.y_button);
     draw_text(g_background.a_text);
     draw_text(g_background.b_text);
+    draw_text(g_background.x_text);
     draw_text(g_background.y_text);
 }
 
@@ -455,6 +490,79 @@ void ui_display_gamecard(void)
         draw_text(g_game_info.text_app_id);   
         draw_text(g_game_info.text_entry_contents);
     }
+}
+
+void ui_display_detailed_gamecard(void)
+{
+    const SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
+    const SDL_Rect dark_box = { box.x, box.y + 72, box.w, box.h - 72 - 75 };
+
+    button_t *l_button = create_button(&FONT_BUTTON[QFontSize_23], 845, box.y + 480, Colour_Nintendo_White, Font_Button_L);
+    button_t *r_button = create_button(&FONT_BUTTON[QFontSize_23], 875, box.y + 480, Colour_Nintendo_White, Font_Button_R);
+    text_t *swap_text = create_text(&FONT_TEXT[QFontSize_23], 910, box.y + 480, Colour_Nintendo_White, "Swap Entry");
+
+    uint16_t cursor = 0;
+    GameInfoDetailed_t info = {0};
+    gc_setup_detailed_game_info(&info, cursor);
+
+    while (appletMainLoop())
+    {
+        input_t input = get_input();
+
+        if (input.down & KEY_B)
+        {
+            break;
+        }
+
+        if (input.down & KEY_L)
+        {
+            cursor = move_cursor_up(cursor, g_game_info.total_count);
+            free_game_info_detailed(&info);
+            gc_setup_detailed_game_info(&info, cursor);
+        }
+        if (input.down & KEY_R)
+        {
+            cursor = move_cursor_down(cursor, g_game_info.total_count);
+            free_game_info_detailed(&info);
+            gc_setup_detailed_game_info(&info, cursor);
+        }
+
+        ui_display_dim_background();
+        SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
+        SDL_DrawShape(Colour_Nintendo_LightBlack, box.x + 375, box.y + 72, box.w - 375, box.h - 72 - 75, true);
+
+        // title / boarder / bottom.
+        SDL_DrawText(FONT_TEXT[QFontSize_28].fnt, box.x + 60, box.y + 30, Colour_Nintendo_White, "Game-Info");
+        SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + 75, box.w - 50, 2, true);
+        SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + box.h - 75, box.w - 50, 2, true);
+        SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 60, box.y + 480, Colour_Nintendo_White, "Page: %u / %u", cursor + 1, g_game_info.total_count);
+
+        draw_button(l_button);
+        draw_button(r_button);
+        draw_text(swap_text);
+
+        if (g_game_info.icon)
+        draw_image_set(g_game_info.icon, 230, 200, g_game_info.icon->rect.w / 2, g_game_info.icon->rect.h / 2);
+        draw_text(info.text_type);
+        draw_text(info.text_id);
+        draw_text(info.text_keygen);
+        draw_text(info.text_version);
+        draw_text(info.text_content_count);
+        draw_text(info.text_content_meta_count);
+
+        for (uint16_t i = 0; i < info.content_count; i++)
+        {
+            draw_text(info.entry[i].name);
+            draw_text(info.entry[i].type);
+            draw_text(info.entry[i].size);
+        }
+
+        SDL_UpdateRenderer();
+    }
+
+    free_button(l_button);
+    free_button(r_button);
+    free_text(swap_text);
 }
 
 void ui_display_button_spin(void)
@@ -532,7 +640,7 @@ void ui_display_options(void)
 
     const char *expl_snd[] =
     {
-        "Enable / disable the sound effects",
+        "Enable / disable the sound effects.",
     };
 
     SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
@@ -666,8 +774,7 @@ void ui_display_options(void)
                 }
             }
         }
-
-        //ui_display_popup_box();
+        
         ui_display_dim_background();
         SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
         SDL_DrawShape(Colour_Nintendo_LightBlack, box.x + 275, box.y + 72, box.w - 275, box.h - 72 - 75, true);
@@ -988,10 +1095,16 @@ uint8_t handle_input(void)
             return Option_Exit;  
     }
 
-    if (input.down & KEY_Y)
+    if (input.down & KEY_X)
     {
         play_sound(g_sound_effects.move, -1, 0);
         ui_display_options();
+    }
+
+    if (input.down & KEY_Y)
+    {
+        play_sound(g_sound_effects.move, -1, 0);
+        ui_display_detailed_gamecard();
     }
 
     int ret = check_if_option(&input);
@@ -1019,7 +1132,7 @@ uint8_t handle_input(void)
             case Option_SD:
                 if (g_gc_inserted)
                 {
-                    if (ui_display_yes_no_box("Install to the Sd Card?"))
+                    if (ui_display_yes_no_box("Install to the SD Card?"))
                     {
                         gc_install(NcmStorageId_SdCard);
                         update_storage_size();

@@ -69,10 +69,37 @@ typedef struct
     uint64_t app_id;
     uint8_t key_gen;
     size_t size;
+    uint32_t total_count;
     uint16_t base_count;
     uint16_t upp_count;
     uint16_t dlc_count;
 } GameInfo_t;
+
+typedef struct
+{
+    text_t *type;
+    text_t *size;
+    text_t *name;
+} GameInfoEntry_t;
+
+typedef struct
+{
+    text_t *text_type;
+    text_t *text_id;
+    text_t *text_keygen;
+    text_t *text_version;
+    text_t *text_content_count;
+    text_t *text_content_meta_count;
+
+    uint8_t type;
+    uint64_t id;
+    uint8_t keygen;
+    uint32_t version;
+    uint16_t content_count;
+    uint16_t content_meta_count;
+
+    GameInfoEntry_t *entry; //array.
+} GameInfoDetailed_t;
 
 
 //

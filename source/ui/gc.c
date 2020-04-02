@@ -202,20 +202,23 @@ bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_
     {
         case NcmContentMetaType_Application:
             memcpy(&GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt, cnmt, sizeof(Cnmt_t));
-            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.content_infos, GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.content_infos, GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].size;
             GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].key_gen = key_gen;
             GAMECARD.entries[pos].base_count++;
             break;
         case NcmContentMetaType_Patch:
             memcpy(&GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt, cnmt, sizeof(Cnmt_t));
-            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.content_infos, GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].upp[GAMECARD.entries[pos].base_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.content_infos, GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].size;
             GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].key_gen = key_gen;
             GAMECARD.entries[pos].upp_count++;
             break;
         case NcmContentMetaType_AddOnContent:
             memcpy(&GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt, cnmt, sizeof(Cnmt_t));
-            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.content_infos, GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.header.content_count);
-            GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].key_gen = key_gen;
+            GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.content_infos, GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].size;
+            GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].key_gen = key_gen;
             GAMECARD.entries[pos].dlc_count++;
             break;
         default:
@@ -223,6 +226,7 @@ bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_
             return false;
     }
 
+    GAMECARD.entries[pos].total_count++;
     return true;
 }
 
@@ -506,11 +510,6 @@ bool __gc_parse_cnmt(void)
         __gc_setup_entry(GAMECARD.entries, &cnmt[i], key_gens[i], pos, cnmt[i].key.type);
     }
 
-    for (uint16_t i = 0; i < GAMECARD.file_table.game_count; i++)
-    {
-        write_log("game %u: base: %u upp: %u dlc: %u\n", i, GAMECARD.entries[i].base_count, GAMECARD.entries[i].upp_count, GAMECARD.entries[i].dlc_count);
-    }
-
     free(key_gens);
     free(sorts);
     free(cnmt);
@@ -645,6 +644,11 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
     out_info->text_entry_contents = create_text(&FONT_TEXT[QFontSize_18], 50, 615, Colour_Nintendo_White, "Base: %u Upp: %u DLC: %u", GAMECARD.entries[game_pos].base_count, GAMECARD.entries[game_pos].upp_count, GAMECARD.entries[game_pos].dlc_count);
     enable_text_clip(out_info->text_entry_contents, 0, 325);
 
+    out_info->base_count = GAMECARD.entries[game_pos].base_count;
+    out_info->upp_count = GAMECARD.entries[game_pos].upp_count;
+    out_info->dlc_count = GAMECARD.entries[game_pos].dlc_count;
+    out_info->total_count = GAMECARD.entries[game_pos].total_count;
+
     // TODO: manually parse the control.nacp if this fails.
     NsApplicationControlData control_data = {0};
     if (ns_get_app_control_data(&control_data, out_info->app_id))
@@ -655,6 +659,58 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
         out_info->author = create_text(&FONT_TEXT[QFontSize_18], 50, 455, Colour_Nintendo_White, control_data.nacp.lang[0].author);
         enable_text_clip(out_info->author, 0, 325);
     }
+    return true;
+}
+
+bool gc_setup_detailed_game_info(GameInfoDetailed_t *info_out, uint16_t entry)
+{
+    if (!info_out || entry >= GAMECARD.entries[g_game_pos].total_count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    // get the entry.
+    const GameCardEntry_t *tmp_entry = {0};
+    if (entry < GAMECARD.entries[g_game_pos].base_count)
+    {
+        tmp_entry = &GAMECARD.entries[g_game_pos].base[entry];
+    }
+    else if (entry < GAMECARD.entries[g_game_pos].base_count + GAMECARD.entries[g_game_pos].upp_count)
+    {
+        tmp_entry = &GAMECARD.entries[g_game_pos].upp[entry - GAMECARD.entries[g_game_pos].base_count];
+    }
+    else
+    {
+        tmp_entry = &GAMECARD.entries[g_game_pos].dlc[entry - (GAMECARD.entries[g_game_pos].base_count + GAMECARD.entries[g_game_pos].upp_count)];
+    }
+
+    // setup the vars.
+    info_out->type = tmp_entry->cnmt.key.type;
+    info_out->id = tmp_entry->cnmt.key.id;
+    info_out->keygen = tmp_entry->key_gen;
+    info_out->version = tmp_entry->cnmt.key.version;
+    info_out->content_count = tmp_entry->cnmt.header.content_count;
+    info_out->content_meta_count = tmp_entry->cnmt.header.content_meta_count;
+
+    info_out->text_type = create_text(&FONT_TEXT[QFontSize_18], 230, 360, Colour_Nintendo_White, "Type: %s", ncm_get_meta_type_string(info_out->type));
+    info_out->text_id = create_text(&FONT_TEXT[QFontSize_18], 230, 390, Colour_Nintendo_White, "ID: %lX", info_out->id);
+    info_out->text_keygen = create_text(&FONT_TEXT[QFontSize_18], 230, 420, Colour_Nintendo_White, "Key-Gen: %u", info_out->keygen);
+    info_out->text_version = create_text(&FONT_TEXT[QFontSize_18], 230, 450, Colour_Nintendo_White, "Version: %u (%u.%u.%u.%u)", info_out->version, (info_out->version >> 26) & 0x3F, (info_out->version >> 20) & 0x2F, (info_out->version >> 16) & 0xF, (uint16_t)info_out->version);
+    info_out->text_content_count = create_text(&FONT_TEXT[QFontSize_18], 230, 480, Colour_Nintendo_White, "Content Count: %u", info_out->content_count);
+    info_out->text_content_meta_count = create_text(&FONT_TEXT[QFontSize_18], 230, 510, Colour_Nintendo_White, "Content Meta Count: %u", info_out->content_meta_count);
+
+    info_out->entry = calloc(info_out->content_count, sizeof(GameInfoEntry_t));
+
+    // setup the textures.
+    for (uint16_t i = 0, y = 195; i < info_out->content_count; i++, y += 47)
+    {
+        char name_buf[0x30] = {0};
+        info_out->entry[i].name = create_text(&FONT_TEXT[QFontSize_18], 575, y, Colour_Nintendo_BrightSilver, "%s%s", nca_get_string_from_id(&tmp_entry->cnmt.content_infos[i].content_id, name_buf), tmp_entry->cnmt.content_infos[i].content_type == NcmContentType_Meta ? ".cnmt.nca" : ".nca");
+        info_out->entry[i].type = create_text(&FONT_TEXT[QFontSize_18], 575, y += 27, Colour_Nintendo_BrightSilver, "Type: %s", ncm_get_content_type_string(tmp_entry->cnmt.content_infos[i].content_type));
+        info_out->entry[i].size = create_text(&FONT_TEXT[QFontSize_18], info_out->entry[i].type->rect.x + info_out->entry[i].type->rect.w + 30, y, Colour_Nintendo_BrightSilver, "Size: %lu", ncm_calculate_content_info_size(&tmp_entry->cnmt.content_infos[i]));
+    }
+
     return true;
 }
 

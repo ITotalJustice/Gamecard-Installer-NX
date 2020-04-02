@@ -37,6 +37,45 @@ typedef struct
     NcmInstall_t ncm;
 } NcaInstall_t;
 
+typedef struct
+{
+    uint64_t id;        // belonging ID.
+    NcaKeyArea_t key;   // the actual key.
+} NcaKeySlot_t;
+NcaKeySlot_t KEYSLOT = {0};
+
+bool nca_set_keyslot(uint64_t id, const uint8_t *key)
+{
+    if (!id || !key)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    // reset to 0.
+    memset(&KEYSLOT, 0, sizeof(NcaKeySlot_t));
+
+    // set new values.
+    KEYSLOT.id = id;
+    memcpy(KEYSLOT.key.area, key, 0x10);
+
+    return true;
+}
+
+NcaKeySlot_t *nca_get_keyslot(void)
+{
+    return &KEYSLOT;
+}
+
+NcaKeyArea_t *nca_get_keyslot_key(void)
+{
+    return &KEYSLOT.key;
+}
+
+uint64_t nca_get_keyslot_id(void)
+{
+    return KEYSLOT.id;
+}
 
 bool nca_check_if_magic_valid(uint32_t magic)
 {

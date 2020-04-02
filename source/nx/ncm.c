@@ -513,29 +513,18 @@ void ncm_get_version_string(uint32_t version, NcmVersionString_t *out)
     sprintf(out->bug_fix, "%u", (uint16_t)version);
 }
 
+#include <string.h>
 size_t ncm_calculate_content_info_size(const NcmContentInfo *info)
 {
     if (!info)
     {
-        write_log("missing params in ncm_calculate_content_info_size\n");
+        write_log("missing params in %s\n", __func__);
         return 0;
     }
 
-    write_log("size is %lu\n", *(uint64_t*)info->size / 0x40000000);
-    return *(uint64_t*)info->size;
-}
-
-#include <string.h>
-bool __ncm_calculate_content_info_size(const NcmContentInfo *info, size_t *out_size)
-{
-    if (!info)
-    {
-        write_log("missing params in %s\n", __func__);
-        return false;
-    }
-
-    memcpy(out_size, info->size, 0x6);
-    return true;
+    size_t size = 0;
+    memcpy(&size, info->size, 0x6);
+    return size;
 }
 
 size_t ncm_calculate_content_infos_size(const NcmContentInfo *infos, uint16_t count)
@@ -551,7 +540,7 @@ size_t ncm_calculate_content_infos_size(const NcmContentInfo *infos, uint16_t co
     for (uint16_t i = 0; i < count; i++)
     {
         size_t tmp_size = 0;
-        if (!__ncm_calculate_content_info_size(&infos[i], &tmp_size))
+        if (!(tmp_size = ncm_calculate_content_info_size(&infos[i])))
         {
             return 0;
         }
