@@ -45,9 +45,11 @@ ROMFS		:=	romfs
 # options for code generation
 #---------------------------------------------------------------------------------
 
+#DEBUG		:=	-D DEBUG
+
 ARCH		:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 
-CFLAGS		:=	-g -Wall -O3 -ffunction-sections \
+CFLAGS		:=	-g -Wall -O3 $(DEBUG) -ffunction-sections \
 				$(ARCH) $(DEFINES)
 
 CFLAGS		+=	$(INCLUDE) -D__SWITCH__ `freetype-config --cflags` `sdl2-config --cflags`

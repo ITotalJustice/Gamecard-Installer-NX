@@ -69,7 +69,7 @@ bool play_sound_from_file(const char *file, int channel, int loops);
 void pause_resume_song(void);
 
 //
-void pause_resume_sound(int channel);
+void pause_resume_sound(void);
 
 //
 void free_song(song_t *song);

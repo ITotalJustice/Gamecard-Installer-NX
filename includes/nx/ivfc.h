@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define IVFC_MAGIC 0x43465649
+#define IVFC_MAGIC      0x43465649
+#define IVFC_LEVEL_MAX  0x6
 
 
 typedef struct
@@ -18,16 +19,11 @@ typedef struct
 typedef struct
 {
     uint32_t magic;
-    uint32_t always_2; // always 2?
+    uint32_t version; // always 2?
     uint32_t hash_size;
-    uint32_t always_7; // always 7 for program ncas?
-    ivfc_level_t level_1;
-    ivfc_level_t level_2;
-    ivfc_level_t level_3;
-    ivfc_level_t level_4;
-    ivfc_level_t level_5;
-    ivfc_level_t level_6;
-    uint8_t _0xA0[0x20]; // empty
+    uint32_t level_count; // always 7 for program ncas?
+    ivfc_level_t level[IVFC_LEVEL_MAX];
+    uint8_t salt_seed[0x20]; // empty?
     uint8_t hash[0x20];
 } ivfc_header_t;
 

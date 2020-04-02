@@ -65,9 +65,9 @@ int32_t ns_list_app_cnmt_status(NsApplicationContentMetaStatus *out, int32_t cou
 size_t ns_get_app_control_data(NsApplicationControlData *out, uint64_t app_id)
 {
     size_t out_size = 0;
-    /*Result rc = */nsGetApplicationControlData(NsApplicationControlSource_Storage, app_id, out, sizeof(NsApplicationControlData), &out_size);
-    //if (R_FAILED(rc))
-        //write_log("failed to get app control data with app_id: %lu\n", app_id);
+    Result rc = nsGetApplicationControlData(NsApplicationControlSource_Storage, app_id, out, sizeof(NsApplicationControlData), &out_size);
+    if (R_FAILED(rc))
+        write_log("failed to get app control data with app_id: %lu\n", app_id);
     return out_size;
 }
 
@@ -173,9 +173,9 @@ NsApplicationOccupiedSize ns_get_application_occupied_size(uint64_t app_id)
     return size;
 }
 
-Result ns_push_application_record(uint64_t app_id, const NcmContentStorageRecord *records, uint32_t count)
+bool ns_push_application_record(uint64_t app_id, const NcmContentStorageRecord *records, uint32_t count)
 {
-    struct
+    const struct
     {
         uint8_t last_modified_event;
         uint8_t padding[0x7];
@@ -187,13 +187,16 @@ Result ns_push_application_record(uint64_t app_id, const NcmContentStorageRecord
         .buffers = { { records, sizeof(NcmContentStorageRecord) * count } });
 
     if (R_FAILED(rc))
-        write_log("failed to push application record %08X\n", rc);
-    return rc;
+    {
+        write_log("failed to push application record\n");
+        return false;
+    }
+    return true;
 }
 
-Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id, NcmContentStorageRecord *records, uint32_t count)
+bool ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id, NcmContentStorageRecord *records, uint32_t count)
 {
-    struct
+    const struct
     {
         uint64_t offset;
         uint64_t app_id;
@@ -205,16 +208,21 @@ Result ns_list_application_record_content_meta(uint64_t offset, uint64_t app_id,
         .buffers = { { records, sizeof(NcmContentStorageRecord) * count } });
 
     if (R_FAILED(rc))
+    {
         write_log("failed to list app cnmt\n");
-    return rc;
+        return false;
+    }
+    return true;
 }
 
-Result ns_delete_application_record(uint64_t app_id)
+bool ns_delete_application_record(uint64_t app_id)
 {
     Result rc = serviceDispatchIn(&NS_APP_SERV, 27, app_id, SfOutHandleAttr_None);
     if (R_FAILED(rc))
+    {
         write_log("failed to delete application record\n");
-    return rc;
+    }
+    return true;
 }
 
 int32_t ns_count_application_content_meta(uint64_t app_id)
@@ -236,13 +244,32 @@ int32_t ns_count_application_content_meta(uint64_t app_id)
     return count;
 }
 
+//Result ncm_get_latest_key
+bool ns_application_overwrite_previous_entity(uint64_t id)
+{
+    if (!id)
+    {
+        write_log("missing params in ns_application_pverwrite_previous_entity\n");
+        return false;
+    }
+
+    Result rc = nsDeleteApplicationEntity(id);  // this func wraps around ncmContentMetaDatabaseRemove.
+    if (R_FAILED(rc))
+    {
+        write_log("failed to delete application_entity\n");
+        return false;
+    }
+
+    return true;
+}
+
 #include <string.h>
 bool ns_get_gamecard_info(gamecard_info_t *info)
 {
     struct
     {
         uint8_t d[0x10];
-    } out;
+    } out = {0};
 
     Result rc = serviceDispatchOut(&NS_APP_SERV, 46, out);
     if (R_FAILED(rc))
@@ -264,9 +291,22 @@ bool ns_has_application_record(uint64_t app_id) //5.0.0
     return has_record;
 }
 
-void ns_get_application_record()
+bool ns_get_application_record(NcmContentStorageRecord *record_out)
 {
     if (!hosversionAtLeast(2, 0, 0))
-        return;
-    // 900
+        return false;
+
+    struct
+    {
+        uint8_t d[0x18];
+    } out = {0};
+
+    Result rc = serviceDispatchOut(&NS_APP_SERV, 900, out);
+    if (R_FAILED(rc))
+    {
+        write_log("Failed to get gamecard info\n");
+        return false;
+    }
+    memcpy(record_out, &out, sizeof(out));
+    return true;
 }

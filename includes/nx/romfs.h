@@ -3,13 +3,13 @@
 
 #include <stdint.h>
 
-#include "ivfc.h"
+#include "nx/ivfc.h"
 
 
 typedef struct
 {
-    uint8_t _0x0[0x2]; //empty?
     ivfc_header_t ivfc_header;
+    uint8_t _0xE0[0x58];
 } RomfsSuperblock_t;
 
 #endif

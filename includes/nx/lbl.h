@@ -14,8 +14,6 @@ typedef enum
 
 //
 bool init_lbl(void);
-
-//
 void exit_lbl(void);
 
 //
@@ -23,9 +21,5 @@ LblBacklightSwitchStatus get_backlight_status(void);
 
 //
 bool is_backlight_enabled(void);
-
-//
 bool enable_backlight(BacklightFade fade);
-
-//
 bool disable_backlight(BacklightFade fade);

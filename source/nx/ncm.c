@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <switch.h>
 
 #include "nx/ncm.h"
@@ -41,7 +42,7 @@ bool ncm_open_storage(NcmContentStorage *cs, NcmStorageId storage_id)
     return true;
 }
 
-bool ncm_check_if_placeholder_id_exists(NcmContentStorage *cs, NcmPlaceHolderId *placeholder_id)
+bool ncm_check_if_placeholder_id_exists(NcmContentStorage *cs, const NcmPlaceHolderId *placeholder_id)
 {
     if (!cs || !placeholder_id)
     {
@@ -75,7 +76,7 @@ bool ncm_generate_placeholder_id(NcmContentStorage *cs, NcmPlaceHolderId *placeh
     return true;
 }
 
-bool ncm_create_placeholder_id(NcmContentStorage *cs, NcmContentId *content_id, NcmPlaceHolderId *placeholder_id, int64_t size)
+bool ncm_create_placeholder_id(NcmContentStorage *cs, const NcmContentId *content_id, const NcmPlaceHolderId *placeholder_id, int64_t size)
 {
     if (!cs || !placeholder_id || !content_id)
     {
@@ -92,7 +93,7 @@ bool ncm_create_placeholder_id(NcmContentStorage *cs, NcmContentId *content_id, 
     return true;
 }
 
-bool ncm_get_placeholder_id_path(NcmContentStorage *cs, NcmPlaceHolderId *placeholder_id, char *out_path, size_t size)
+bool ncm_get_placeholder_id_path(NcmContentStorage *cs, const NcmPlaceHolderId *placeholder_id, char *out_path, size_t size)
 {
     if (!cs || !placeholder_id || !out_path || !size)
     {
@@ -109,7 +110,7 @@ bool ncm_get_placeholder_id_path(NcmContentStorage *cs, NcmPlaceHolderId *placeh
     return true;
 }
 
-bool ncm_write_placeholder_id(NcmContentStorage *cs, NcmPlaceHolderId *placeholder_id, uint64_t offset, void *data, size_t data_size)
+bool ncm_write_placeholder_id(NcmContentStorage *cs, const NcmPlaceHolderId *placeholder_id, uint64_t offset, const void *data, size_t data_size)
 {
     if (!cs || !placeholder_id || !data || !data_size)
     {
@@ -126,7 +127,7 @@ bool ncm_write_placeholder_id(NcmContentStorage *cs, NcmPlaceHolderId *placehold
     return true;
 }
 
-bool ncm_delete_placeholder_id(NcmContentStorage *cs, NcmPlaceHolderId *placeholder_id)
+bool ncm_delete_placeholder_id(NcmContentStorage *cs, const NcmPlaceHolderId *placeholder_id)
 {
     if (!cs || !placeholder_id)
     {
@@ -166,7 +167,7 @@ void ncm_delete_all_placeholders_id(void)
     }
 }
 
-bool ncm_register_placeholder_id(NcmContentStorage *cs, NcmContentId *content_id, NcmPlaceHolderId *placeholder_id)
+bool ncm_register_placeholder_id(NcmContentStorage *cs, const NcmContentId *content_id, const NcmPlaceHolderId *placeholder_id)
 {
     if (!cs || !placeholder_id || !placeholder_id)
     {
@@ -183,7 +184,7 @@ bool ncm_register_placeholder_id(NcmContentStorage *cs, NcmContentId *content_id
     return true;
 }
 
-bool ncm_check_if_content_id_exists(NcmContentStorage *cs, NcmContentId *content_id)
+bool ncm_check_if_content_id_exists(NcmContentStorage *cs, const NcmContentId *content_id)
 {
     if (!cs || !content_id)
     {
@@ -201,7 +202,7 @@ bool ncm_check_if_content_id_exists(NcmContentStorage *cs, NcmContentId *content
     return exist_out;
 }
 
-bool ncm_delete_content_id(NcmContentStorage *cs, NcmContentId *content_id)
+bool ncm_delete_content_id(NcmContentStorage *cs, const NcmContentId *content_id)
 {
     if (!cs || !content_id)
     {
@@ -218,7 +219,7 @@ bool ncm_delete_content_id(NcmContentStorage *cs, NcmContentId *content_id)
     return true;
 }
 
-bool ncm_get_content_id_path(NcmContentStorage *cs, char *path_out, size_t size, NcmContentId *content_id)
+bool ncm_get_content_id_path(NcmContentStorage *cs, char *path_out, size_t size, const NcmContentId *content_id)
 {
     if (!cs || !content_id || !path_out || !size)
     {
@@ -235,7 +236,7 @@ bool ncm_get_content_id_path(NcmContentStorage *cs, char *path_out, size_t size,
     return true;
 }
 
-int64_t ncm_get_placeholder_id_size(NcmContentStorage *cs, NcmPlaceHolderId *placeholder_id)
+int64_t ncm_get_placeholder_id_size(NcmContentStorage *cs, const NcmPlaceHolderId *placeholder_id)
 {
     if (!cs || !placeholder_id)
     {
@@ -253,12 +254,12 @@ int64_t ncm_get_placeholder_id_size(NcmContentStorage *cs, NcmPlaceHolderId *pla
     return size;
 }
 
-int64_t ncm_get_content_id_size(NcmContentStorage *cs, NcmContentId *content_id)
+int64_t ncm_get_content_id_size(NcmContentStorage *cs, const NcmContentId *content_id)
 {
     if (!cs || !content_id)
     {
         write_log("missing params in ncm_get_size_of_content_id\n");
-        return false;
+        return 0;
     }
 
     int64_t size = 0;
@@ -271,7 +272,7 @@ int64_t ncm_get_content_id_size(NcmContentStorage *cs, NcmContentId *content_id)
     return size;
 }
 
-bool ncm_read_content_id(NcmContentStorage *cs, void *data, size_t data_size, uint64_t offset, NcmContentId *content_id)
+bool ncm_read_content_id(NcmContentStorage *cs, void *data, size_t data_size, uint64_t offset, const NcmContentId *content_id)
 {
     Result rc = ncmContentStorageReadContentIdFile(cs, data, data_size, content_id, offset);
     if (R_FAILED(rc))
@@ -389,17 +390,118 @@ int32_t ncm_get_meta_total(NcmContentMetaDatabase *db, NcmContentMetaType type)
     return total;
 }
 
+bool ncm_get_latest_key(NcmContentMetaDatabase *db, NcmContentMetaKey *key_out, uint64_t id)
+{
+    if (!db || !key_out || !id)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    Result rc = ncmContentMetaDatabaseGetLatestContentMetaKey(db, key_out, id);
+    if (rc == 3589) // none found, not an error. still return false because no key.
+    {
+        write_log("no latest key found for id: %lX\n", id);
+        return false;
+    }
+    if (R_FAILED(rc))
+    {
+        write_log("failed to get latest key\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool ncm_get_latest_key2(NcmContentMetaKey *out_key, uint64_t id) // temp name
+{
+    if (!id)
+    {
+        write_log("missing params in %s\n", __func__);
+        return 1;
+    }
+
+    // vars
+    NcmContentMetaDatabase db_user = {0};
+    NcmContentMetaDatabase db_sdcard = {0};
+    NcmContentMetaKey key_user = {0};
+    NcmContentMetaKey key_sdcard = {0};
+
+    // open both storage.
+    ncm_open_database(&db_user, NcmStorageId_BuiltInUser);
+    ncm_open_database(&db_sdcard, NcmStorageId_SdCard);
+
+    // first we try to find it in user, the sdcard.
+    write_log("trying nand\n");
+    bool has_user = ncm_get_latest_key(&db_user, &key_user, id);
+    write_log("trying sd\n");
+    bool has_sdcard = ncm_get_latest_key(&db_sdcard, &key_sdcard, id);
+
+    // now close.
+    ncm_close_database(&db_user);
+    ncm_close_database(&db_sdcard);
+
+    // check if any was found.
+    if (!has_user && !has_sdcard)
+    {
+        return false;
+    }
+
+    // If theres 2 versions (ie. 2 updates exist because they were installed by bad installers), pick the highest value.
+    if (has_user && has_sdcard)
+    {
+        write_log("found meta key id: %lx on sdcard and nand\n", id);
+
+        // select highest versions
+        if (key_user.version > key_sdcard.version)
+        {
+            *out_key = key_user;
+            return true;
+        }
+        else
+        {
+            *out_key = key_sdcard;
+            return true;
+        }
+    }
+
+    if (has_user)
+    {
+        *out_key = key_user;
+        return true;
+    }
+    else
+    {
+        *out_key = key_sdcard;
+        return true;
+    }
+}
+
+bool ncm_is_key_newer(const NcmContentMetaKey *key)
+{
+    NcmContentMetaKey key_out = {0};
+
+    // if it couldnt find a key, its newer.
+    if (!ncm_get_latest_key2(&key_out, key->id))
+    {
+        return true;
+    }
+
+    write_log("new: %u installed: %u\n", key->version, key_out.version);
+    return key->version >= key_out.version;
+}
+
 bool ncm_get_version(uint32_t version, uint8_t *major, uint8_t *minor, uint8_t *macro)
 {
     if (!version || !major || !minor || !macro)
     {
-        write_log ("Missing params in ncm_get_version\n");
+        write_log ("Missing params in %s\n", __func__);
         return false;
     }
 
-    *major = (u8)((version >> 26) & 0x3F);
-    *minor = (u8)((version >> 20) & 0x3F);
-    *macro = (u8)((version >> 16) & 0xF);
+    *major = (uint8_t)((version >> 26) & 0x3F);
+    *minor = (uint8_t)((version >> 20) & 0x3F);
+    *macro = (uint8_t)((version >> 16) & 0xF);
     return true;
 }
 
@@ -408,7 +510,75 @@ void ncm_get_version_string(uint32_t version, NcmVersionString_t *out)
     sprintf(out->major, "%u", (version >> 26) & 0x3F);
     sprintf(out->minor, "%u", (version >> 20) & 0x3F);
     sprintf(out->macro, "%u", (version >> 16) & 0xF);
-    sprintf(out->bug_fix, "%u", (u16)version);
+    sprintf(out->bug_fix, "%u", (uint16_t)version);
+}
+
+size_t ncm_calculate_content_info_size(const NcmContentInfo *info)
+{
+    if (!info)
+    {
+        write_log("missing params in ncm_calculate_content_info_size\n");
+        return 0;
+    }
+
+    write_log("size is %lu\n", *(uint64_t*)info->size / 0x40000000);
+    return *(uint64_t*)info->size;
+}
+
+#include <string.h>
+bool __ncm_calculate_content_info_size(const NcmContentInfo *info, size_t *out_size)
+{
+    if (!info)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    memcpy(out_size, info->size, 0x6);
+    return true;
+}
+
+size_t ncm_calculate_content_infos_size(const NcmContentInfo *infos, uint16_t count)
+{
+    if (!infos || !count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return 0;
+    }
+
+    size_t size = 0;
+    
+    for (uint16_t i = 0; i < count; i++)
+    {
+        size_t tmp_size = 0;
+        if (!__ncm_calculate_content_info_size(&infos[i], &tmp_size))
+        {
+            return 0;
+        }
+        size += tmp_size;
+    }
+
+    return size;
+}
+
+bool ncm_get_content_type_from_infos(NcmContentInfo *infos, uint16_t count, NcmContentInfo *found, NcmContentType wanted_type)
+{
+    if (!infos || !count || !found)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    for (uint16_t i = 0; i < count; i++)
+    {
+        if (infos[i].content_type == wanted_type)
+        {
+            *found = infos[i];
+            return true;
+        }
+    }
+
+    return false;
 }
 
 uint64_t ncm_get_app_id_from_title_id(uint64_t title_id, NcmContentMetaType type)
@@ -430,7 +600,7 @@ uint64_t ncm_get_app_id_from_title_id(uint64_t title_id, NcmContentMetaType type
         case NcmContentMetaType_Patch:
             return title_id ^ 0x800;
         case NcmContentMetaType_AddOnContent:
-            return title_id ^ 0x1000;
+            return (title_id ^ 0x1000) & ~0xFFF;
         default:
             return 0;                              
     }
@@ -522,4 +692,91 @@ const char *ncm_get_attribute_string(NcmContentMetaAttribute attribute)
         default:
             return "NULL";
     }
+}
+
+const char *ncm_get_install_type_string(NcmContentInstallType type)
+{
+    switch (type)
+    {
+        case NcmContentInstallType_Full:
+            return "Full";
+        case NcmContentInstallType_FragmentOnly:
+            return "FragmentOnly";
+        case NcmContentInstallType_Unknown:
+            return "Unknown";
+        default:
+            return "NULL";
+    }
+}
+
+
+/*
+*   Debug
+*/
+
+void ncm_print_key(const NcmContentMetaKey *key)
+{
+    #ifdef DEBUG
+    if (!key)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    write_log("\nncm key print\n");
+    write_log("id: %lX\n", key->id);
+    write_log("title_version: %u\n", key->version);
+    write_log("meta_type: %s\n", ncm_get_meta_type_string(key->type));
+    write_log("install_type: %s\n", ncm_get_install_type_string(key->install_type));
+    #endif
+}
+
+void ncm_print_keys(const NcmContentMetaKey *key, uint16_t count)
+{
+    #ifdef DEBUG
+    if (!key || !count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    for (uint16_t i = 0; i < count; i++)
+    {
+        ncm_print_key(&key[i]);
+    }
+    #endif
+}
+
+void ncm_print_application_record(const NcmContentStorageRecord *record)
+{
+    #ifdef DEBUG
+    if (!record)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    write_log("\napplication_record\n");
+    write_log("id %lX\n", record->key.id);
+    write_log("version: %u\n", record->key.version);
+    write_log("meta_type: %s\n", ncm_get_meta_type_string(record->key.type));
+    write_log("install_type: %s\n", ncm_get_install_type_string(record->key.install_type));
+    write_log("storage_id: %s\n", ncm_get_storage_id_string(record->storage_id));
+    #endif
+}
+
+void ncm_print_application_records(const NcmContentStorageRecord *records, uint32_t count)
+{
+    #ifdef DEBUG
+    if (!records || !count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+        ncm_print_application_record(&records[i]);
+    }
+    #endif
 }

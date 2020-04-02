@@ -4,6 +4,7 @@
 
 #include "ui/menu.h"
 #include "ui/gc.h"
+#include "ui/settings.h"
 
 #include "gfx/SDL_easy.h"
 #include "gfx/image.h"
@@ -18,8 +19,13 @@
 #include "nx/input.h"
 #include "nx/lbl.h"
 
+#include "util/log.h"
 
+#ifdef DEBUG
+#define TITLE_NAME      "GameCard Installer (DEBUG)"
+#else
 #define TITLE_NAME      "GameCard Installer"
+#endif
 #define EMPTY_ICON_PATH "romfs:/no_icon.jpg"
 #define STORAGE_BAR_W   325
 #define STORAGE_BAR_H   15
@@ -62,6 +68,8 @@ typedef struct
     button_t *a_button;
     button_t *b_button;
     button_t *y_button;
+    button_t *l_button;
+    button_t *r_button;
     button_t *app_icon;
 } Background_t;
 Background_t g_background = {0};
@@ -84,20 +92,6 @@ typedef struct
 } SoundEffects_t;
 SoundEffects_t g_sound_effects = {0};
 
-// for colour pulsing boxes.
-typedef struct
-{
-    SDL_Colour col;
-    bool increase_blue;
-    uint8_t delay;
-} PulseColour_t;
-
-typedef struct
-{
-    PulseColour_t pulse;
-    SDL_Rect rect;
-} PulseShape_t;
-
 typedef struct
 {
     size_t free;
@@ -112,7 +106,7 @@ Storage_t g_nand_storage = {0};
 Storage_t g_sd_storage = {0};
 
 // the gamecard struct that will contain info on the gc, as well as gfx data.
-GameCard_t gamecard = {0};
+GameInfo_t g_game_info = {0};
 
 // the default icon that is rendered if no gamecard is inserted.
 image_t *g_empty_icon = {0};
@@ -240,9 +234,26 @@ void free_tetris(void)
     }
 }
 
+void free_game_info(GameInfo_t *game_info)
+{
+    if (!game_info)
+    {
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+
+    free_image(game_info->icon);
+    free_text(game_info->title);
+    free_text(game_info->author);
+    free_text(game_info->text_size);
+    free_text(game_info->text_key_gen);
+    free_text(game_info->text_app_id);
+    memset(game_info, 0, sizeof(GameInfo_t));
+}
+
 bool init_menu(void)
 {
-    ncm_delete_all_placeholders_id();
+    //ncm_delete_all_placeholders_id();
 
     // romfs will contain the empty icon and sound effects.
     if (R_FAILED(romfsInit()))
@@ -279,7 +290,6 @@ void exit_menu(void)
     free_storage();
     free_sound_effects();
     free_tetris();
-    unmount_gc(&gamecard);
 }
 
 
@@ -334,15 +344,25 @@ void update_storage_size(void)
 
 void update_gamecard(void)
 {
-    if (poll_gc() != g_gc_inserted)
+    if (gc_poll() != g_gc_inserted)
     {
         update_button_spin();
         play_sound(g_sound_effects.insert, -1, 0);
-        bool ret = g_gc_inserted ? unmount_gc(&gamecard) : mount_gc(&gamecard);
 
-        // mounting the gamecard can fail, only set flag to true if the gamecard is mounted.
-        if (ret)
-            g_gc_inserted = !g_gc_inserted;
+        if (g_gc_inserted)
+        {
+            g_gc_inserted = false;
+            gc_unmount();
+            free_game_info(&g_game_info);
+        }
+        else
+        {
+            if (gc_mount())
+            {
+                gc_setup_game_info(&g_game_info, 0);
+                g_gc_inserted = true;
+            }
+        }
     }
 }
 
@@ -426,12 +446,12 @@ void ui_display_gamecard(void)
     }
     else
     {
-        draw_image2(gamecard.icon);
-        draw_text(gamecard.title);
-        draw_text(gamecard.author);
-        draw_text(gamecard.text_size);
-        draw_text(gamecard.text_key_gen);
-        draw_text(gamecard.text_app_id);   
+        draw_image2(g_game_info.icon);
+        draw_text(g_game_info.title);
+        draw_text(g_game_info.author);
+        draw_text(g_game_info.text_size);
+        draw_text(g_game_info.text_key_gen);
+        draw_text(g_game_info.text_app_id);   
     }
 }
 
@@ -463,30 +483,6 @@ void ui_display_popup_box(void)
     SDL_DrawShape(Colour_Nintendo_DarkGrey, box.x, box.y, box.w, box.h, true);
 }
 
-bool g_lower_key_gen = false;
-bool g_enable_bl = true;
-#include "nx/crypto.h"
-
-bool is_lower_key_gen_enabled(void)
-{
-    return g_lower_key_gen;
-}
-
-bool is_bl_enabled(void)
-{
-    return g_enable_bl;
-}
-
-void set_lower_key_gen(bool on)
-{
-    g_lower_key_gen = on;
-}
-
-void set_bl(bool on)
-{
-    g_enable_bl = on;
-}
-
 void ui_draw_spacers(int x, int y, int txt_size)
 {
     SDL_DrawShape(Colour_Nintendo_Silver, x - 25, y-18, 500 + 50, 1, true);
@@ -499,26 +495,32 @@ void ui_draw_highlight_box(PulseShape_t *pulse_shape, int x, int y, int w, int h
     update_pulse_colour(&pulse_shape->pulse);
 }
 
-void ui_display_options_sub_menu(void)
-{
-
-}
-
+// this code should be made illegal.
+// this is what happens when you want to bang out a ui menu in 1 hour.
+// TODO: burn the code.
+// ACTUAL TODO: write a usable ui framework.
+// - one that doesn't leak mem and that actually caches stuff.
 void ui_display_options(void)
 {
     PulseShape_t pulse_shape = { { {0, 255, 187, 255} , false, 0 }, { 0 } };
     
+    const char *title_base = "Install Base";
+    const char *title_update = "Install Update";
+    const char *title_dlc = "Install DLC";
+    const char *title_music = "Enable Music";
+    const char *title_sound = "Sound Effects";
+
+    const char *hdr[] = 
+    {
+        "Installation",
+        "Sounds",
+        "Exit",
+    };
+
     const char *expl_keygen[] =
     {
         "This will re-encrypt the key area of all the nca's with keygen 0.",
-        "Allows the game to be launched on ALL firmware versions.",
-        "Some games might use syscalls only avaliable on higher firmware.",
-    };
-
-    const char *expl_bl[] =
-    {
-        "Enable / disable the backlight while installing.",
-        "The screen will stay off until the game finishes installing",
+        "Allows some games to be launched on lower firmware versions.",
     };
 
     const char *expl_mus[] =
@@ -531,21 +533,30 @@ void ui_display_options(void)
         "Enable / disable the sound effects",
     };
 
-    // i really cba to write a nice ui system. maybe someday, but not today.
-    // whilst doing all of this manually is pretty insane and does not scale well, at least it looks nice.
     SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
-    bool _has_keys = has_keys();
-    bool _music = true;
-    bool _sound = true;
+
+    SettingFlag install_base = setting_get_install_base();
+    SettingFlag install_upp = setting_get_install_upp();
+    SettingFlag install_dlc = setting_get_install_dlc();
+    SettingFlag install_lower_key_gen = setting_get_install_lower_key_gen();
+
+    SettingFlag sound_sound = setting_get_sound();
+    SettingFlag sound_music = setting_get_music();
+
     uint8_t cursor = 0;
     uint8_t r_cursor = 0;
     bool left_column = true;
 
-    uint8_t cursor_max[] = { 2, 2, 0 };
+    uint8_t cursor_max[] = { 4, 2, 0 };
 
     while (appletMainLoop())
     {
         input_t input = get_input();
+
+        if (input.down)
+        {
+            play_sound(g_sound_effects.move, -1, 0);
+        }
 
         if (input.down & KEY_B)
         {
@@ -600,12 +611,26 @@ void ui_display_options(void)
                         {
                             case 0:
                             {
-                                if (_has_keys) g_lower_key_gen = !g_lower_key_gen;
+                                install_base = !install_base;
+                                setting_set_install_base(install_base);
                                 break;
                             }
                             case 1:
                             {
-                                g_enable_bl = !g_enable_bl;
+                                install_upp = !install_upp;
+                                setting_set_install_upp(install_upp);
+                                break;
+                            }
+                            case 2:
+                            {
+                                install_dlc = !install_dlc;
+                                setting_set_install_dlc(install_dlc);
+                                break;
+                            }
+                            case 3:
+                            {
+                                install_lower_key_gen = !install_lower_key_gen;
+                                setting_set_install_lower_key_gen(install_lower_key_gen);
                                 break;
                             }
                         }
@@ -617,12 +642,14 @@ void ui_display_options(void)
                         {
                             case 0:
                             {
-                                _music = !_music;
+                                sound_music = !sound_music;
+                                setting_set_music(sound_music);
                                 break;
                             }
                             case 1:
                             {
-                                _sound = !_sound;
+                                sound_sound = !sound_sound;
+                                setting_set_sound(sound_sound);
                                 break;
                             }
                         }
@@ -647,13 +674,6 @@ void ui_display_options(void)
         SDL_DrawText(FONT_TEXT[QFontSize_28].fnt, box.x + 60, box.y + 30, Colour_Nintendo_White, "Settings");
         
 
-        const char *hdr[] = 
-        {
-            "Installation",
-            "Sounds",
-            "Exit",
-        };
-
         for (int i = 0, y = box.y + 155; i < 3; i++, y += 100)
         {
             SDL_DrawText(FONT_TEXT[QFontSize_25].fnt, box.x + 50, y, cursor == i ? Colour_Nintendo_Cyan : Colour_Nintendo_White, "%s", hdr[i]);
@@ -671,49 +691,59 @@ void ui_display_options(void)
         {
             case 0:
             {
-                //keygen
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 140, Colour_Nintendo_White, "Lower Keygen Version");
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 140, g_lower_key_gen ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", g_lower_key_gen ? "On" : "Off");
-                ui_draw_spacers(box.x + 350, box.y + 140, 23);
+                //base
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 135, Colour_Nintendo_White, title_base);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 135, install_base ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", install_base ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 135, 23);
                 if (!left_column && r_cursor == 0)
-                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 140, 550, 40);
-                for (int i = 0, y = box.y + 190; i < 3; i++, y+= 25)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 135, 550, 40);
+                
+                //upp
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 195, Colour_Nintendo_White, title_update);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 195, install_upp ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", install_upp ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 195, 23);
+                if (!left_column && r_cursor == 1)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 195, 550, 40);
+                
+                //dlc
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 255, Colour_Nintendo_White, title_dlc);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 255, install_dlc ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", install_dlc ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 255, 23);
+                if (!left_column && r_cursor == 2)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 255, 550, 40);
+
+                //keygen
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 335, Colour_Nintendo_White, "Lower Keygen Version");
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 335, install_lower_key_gen ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", install_lower_key_gen ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 335, 23);
+                if (!left_column && r_cursor == 3)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 335, 550, 40);
+                for (int i = 0, y = box.y + 390; i < 2; i++, y+= 25)
                 {
                     SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_keygen[i]);
-                }
-
-                //backlight
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 315, Colour_Nintendo_White, "Backlight Whilst Installing");
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 315, g_enable_bl ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", g_enable_bl ? "On" : "Off");
-                ui_draw_spacers(box.x + 350, box.y + 315, 23);
-                if (!left_column && r_cursor == 1)
-                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 315, 550, 40);
-                for (int i = 0, y = box.y + 365; i < 2; i++, y+= 25)
-                {
-                    SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_bl[i]);
                 }
                 break;
             }
             case 1:
             {
                 //music
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 140, Colour_Nintendo_White, "Music");
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 140, _music ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", _music ? "On" : "Off");
-                ui_draw_spacers(box.x + 350, box.y + 140, 23);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 135, Colour_Nintendo_White, title_music);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 135, sound_music ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", sound_music ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 135, 23);
                 if (!left_column && r_cursor == 0)
-                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 140, 550, 40);
-                for (int i = 0, y = box.y + 190; i < 1; i++, y+= 25)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 135, 550, 40);
+                for (int i = 0, y = box.y + 185; i < 1; i++, y+= 25)
                 {
                     SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_mus[i]);
                 }
 
                 //sound
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 270, Colour_Nintendo_White, "Sound Effects");
-                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 270, _sound ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", _sound ? "On" : "Off");
-                ui_draw_spacers(box.x + 350, box.y + 270, 23);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 350, box.y + 265, Colour_Nintendo_White, title_sound);
+                SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 800, box.y + 265, sound_sound ? Colour_Nintendo_Cyan : Colour_Nintendo_Silver, "%s", sound_sound ? "On" : "Off");
+                ui_draw_spacers(box.x + 350, box.y + 265, 23);
                 if (!left_column && r_cursor == 1)
-                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 270, 550, 40);
-                for (int i = 0, y = box.y + 320; i < 1; i++, y+= 25)
+                    ui_draw_highlight_box(&pulse_shape, box.x + 350, box.y + 265, 550, 40);
+                for (int i = 0, y = box.y + 315; i < 1; i++, y+= 25)
                 {
                     SDL_DrawText(FONT_TEXT[QFontSize_15].fnt, box.x + 350, y, Colour_Nintendo_BrightSilver, "%s", expl_snd[i]);
                 }
@@ -783,21 +813,7 @@ bool ui_display_yes_no_box(const char *message)
     return flag;
 }
 
-#define DEBUG
-bool ui_display_debug_box(const char * message, ...)
-{
-    #ifdef DEBUG
-    char full_text[0x100] = {0};
-    va_list v;
-    va_start(v, message);
-    vsnprintf(full_text, 0x100, message, v);
-    va_end(v);
-
-    return ui_display_yes_no_box(full_text);
-    #endif
-    return true;
-}
-void ui_display_error_box(uint32_t err)
+void ui_display_error_box(ErrorCodes err, const char *func)
 {
     if (!is_backlight_enabled())
     {
@@ -811,10 +827,11 @@ void ui_display_error_box(uint32_t err)
     ui_display_popup_box();
 
     SDL_Rect box = { 455, 470, 365, 65 };
-    SDL_DrawButton(FONT_BUTTON[QFontSize_63].fnt, 0xE140, 608, 190, Colour_Nintendo_Red);
-    SDL_DrawText(FONT_TEXT[QFontSize_25].fnt, 520, 290, Colour_Nintendo_White, "Error code: 0x%04X", err);
-    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 340, 360, Colour_Nintendo_BrightSilver, "If this message appears repeatedly, please open an issue.");
-    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 320, 405, Colour_Nintendo_BrightSilver, "https://github.com/ITotalJustice/Gamecard-Installer-NX/issues");
+    SDL_DrawButton(FONT_BUTTON[QFontSize_63].fnt, 0xE140, 608, 180, Colour_Nintendo_Red);
+    SDL_DrawText(FONT_TEXT[QFontSize_25].fnt, 520, 270, Colour_Nintendo_White, "Error code: 0x%04X", err);
+    SDL_DrawTextCenterX(FONT_TEXT[QFontSize_23].fnt, 325, box.x, box.w, Colour_Nintendo_White, "%s in %s()", error_get_description(err), func);
+    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 340, 380, Colour_Nintendo_BrightSilver, "If this message appears repeatedly, please open an issue.");
+    SDL_DrawText(FONT_TEXT[QFontSize_20].fnt, 320, 415, Colour_Nintendo_BrightSilver, "https://github.com/ITotalJustice/Gamecard-Installer-NX/issues");
     SDL_DrawShapeOutline(Colour_Nintendo_Cyan, box.x, box.y, box.w, box.h, 5);
     SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, 620, box.y + 25, Colour_Nintendo_White, "OK");
 
@@ -835,6 +852,7 @@ void ui_display_error_box(uint32_t err)
 progress_bar_t *ui_init_progress_bar(const char *name, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining)
 {
     progress_bar_t *p_bar = calloc(1, sizeof(progress_bar_t));
+    if (!p_bar) return NULL;
 
     // shapes.
     SDL_Rect prog_bar = { 400, 470, 480, 12 };
@@ -859,6 +877,7 @@ progress_bar_t *ui_init_progress_bar(const char *name, uint64_t speed, uint16_t 
 
 void ui_free_progress_bar(progress_bar_t *p_bar)
 {
+    if (!p_bar) return;
     free_text(p_bar->text_header);
     free_text(p_bar->text_warning1);
     free_text(p_bar->text_warning2);
@@ -890,8 +909,6 @@ void ui_update_progress_bar(progress_bar_t *p_bar, uint64_t speed, uint16_t eta_
 
 void ui_display_progress_bar(progress_bar_t *p_bar)
 {
-    //write_log("drawing bar\n");
-
     // display the popup box.
     ui_display_popup_box();
 
@@ -901,8 +918,8 @@ void ui_display_progress_bar(progress_bar_t *p_bar)
     draw_text(p_bar->text_warning2);
 
     // game icon and speed.
-    if (gamecard.icon)
-        draw_image_set(gamecard.icon, 320, 200, gamecard.icon->rect.w / 2, gamecard.icon->rect.h / 2);
+    if (g_game_info.icon)
+        draw_image_set(g_game_info.icon, 320, 200, g_game_info.icon->rect.w / 2, g_game_info.icon->rect.h / 2);
     draw_text(p_bar->text_speed);
     draw_text(p_bar->text_name);
     draw_text(p_bar->text_time);
@@ -947,9 +964,14 @@ uint8_t handle_input(void)
         play_sound(g_sound_effects.move, -1, 0);
     }
 
-    if (input.down & KEY_L || input.down & KEY_R)
+    if (input.down & KEY_L)
     {
-        swap_game_in_gc(&gamecard);
+        gc_prev_game(&g_game_info);
+    }
+
+    if (input.down & KEY_R)
+    {
+        gc_next_game(&g_game_info);
     }
 
     if (input.down & KEY_B)
@@ -960,6 +982,7 @@ uint8_t handle_input(void)
 
     if (input.down & KEY_Y)
     {
+        play_sound(g_sound_effects.move, -1, 0);
         ui_display_options();
     }
 
@@ -980,7 +1003,7 @@ uint8_t handle_input(void)
                 {
                     if (ui_display_yes_no_box("Install to the Nand?"))
                     {
-                        install_gc(&gamecard, NcmStorageId_BuiltInUser);
+                        gc_install(NcmStorageId_BuiltInUser);
                         update_storage_size();
                     }
                 }
@@ -990,7 +1013,7 @@ uint8_t handle_input(void)
                 {
                     if (ui_display_yes_no_box("Install to the Sd Card?"))
                     {
-                        install_gc(&gamecard, NcmStorageId_SdCard);
+                        gc_install(NcmStorageId_SdCard);
                         update_storage_size();
                     }
                 }

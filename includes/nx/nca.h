@@ -104,24 +104,6 @@ typedef enum
 
 typedef struct
 {
-    bool lower_key_gen;
-
-    struct
-    {
-        bool title;
-        char title_text[0x200];
-        bool author;
-        char author_text[0x100];
-
-        bool screenshot;
-        bool video_capture_mode;
-        bool required_network_service_license_on_launch_flag;
-    } control_t;
-    NacpStruct nacp;
-} Nca_Option_t;
-
-typedef struct
-{
     uint32_t media_start_offset; // divided by 0x200.
     uint32_t media_end_offset;   // divided by 0x200.
     uint32_t _0x8;               // unkown.
@@ -130,34 +112,41 @@ typedef struct
 
 typedef struct
 {
+    uint64_t offset;
+    uint64_t size;
+    uint32_t magic; // BKTR
+    uint8_t _0x14[0x4];
+    uint8_t _0x18[0x4];
+    uint8_t _0x1C[0x4];
+} PatchInfo_t;
+
+typedef struct
+{
     uint16_t version;           // always 2.
     uint8_t fs_type;            // see NcaFileSystemType.
     uint8_t hash_type;          // see NcaHashType.
     uint8_t encryption_type;    // see NcaEncryptionType.
-    uint8_t _0x5[0x1];          // empty.
-
-    uint8_t hash[0x20];
-    uint32_t block_size;
-    uint8_t always_2[0x4];
-    uint64_t hash_table_offset;
-    uint64_t hash_table_size;
-    
+    uint8_t _0x5[0x3];          // empty.
     union
     {
+        uint8_t section_data[0xF8];
         Pfs0Superblock_t pfs0_sb;
         RomfsSuperblock_t romfs_sb;
         // anything else?????
     };
+    PatchInfo_t patch_info1;
+    PatchInfo_t patch_info2;
     union
     {
-        uint8_t section_ctr[0x8];
+        uint64_t section_ctr;
         struct
         {
             uint32_t section_ctr_low;
             uint32_t section_ctr_high;
         };
     };
-    uint8_t _0x148[0xB8];       // empty.
+    uint8_t sparse_info[0x30];
+    uint8_t _0x178[0x88];       /* Padding. */
 } NcaFsHeader_t;
 
 typedef struct
@@ -191,15 +180,15 @@ typedef struct
     uint8_t key_gen;                // see NcaKeyGeneration.
     uint8_t header_1_sig_key_gen;
     uint8_t _0x221[0xE];            // empty.
-    RightsId_t rights_id;
+    FsRightsId rights_id;
 
-    NcaSectionTableEntry_t section_table[0x4];
-    NcaSectionHeaderHash_t section_header_hash[0x4];
-    NcaKeyArea_t key_area[0x4];
+    NcaSectionTableEntry_t section_table[NCA_SECTION_TOTAL];
+    NcaSectionHeaderHash_t section_header_hash[NCA_SECTION_TOTAL];
+    NcaKeyArea_t key_area[NCA_SECTION_TOTAL];
 
     uint8_t _0x340[0xC0];           // empty.
 
-    NcaFsHeader_t section_header[0x4];
+    NcaFsHeader_t section_header[NCA_SECTION_TOTAL];
 } NcaHeader_t;
 
 
@@ -208,26 +197,12 @@ bool nca_check_if_magic_valid(uint32_t magic);
 
 //
 const char *nca_get_magic_string(uint32_t magic);
-
-//
 const char *nca_get_distribution_type_string(NcaDistributionType type);
-
-//
 const char *nca_get_content_type_string(NcaContentType type);
-
-//
 const char *nca_get_keak_index_string(NcaKeyAreaEncryptionKeyIndex index);
-
-//
 const char *nca_get_file_system_type_string(NcaFileSystemType type);
-
-//
 const char *nca_get_hash_type_string(NcaHashType type);
-
-//
 const char *nca_get_encryption_type_string(NcaEncryptionType type);
-
-//
 const char *nca_return_key_gen_string(uint8_t key_gen);
 
 //
@@ -237,10 +212,10 @@ uint16_t nca_return_key_gen_int(uint8_t key_gen);
 bool nca_check_key_gen(uint8_t key_gen);
 
 //
-const char *nca_get_string_from_id(NcmContentId *nca_id, char *out);
+const char *nca_get_string_from_id(const NcmContentId *nca_id, char *out);
 
 //
-NcmContentId nca_get_id_from_string(const char *nca_in_string);
+const NcmContentId nca_get_id_from_string(const char *nca_in_string);
 
 
 /*
@@ -248,18 +223,19 @@ NcmContentId nca_get_id_from_string(const char *nca_in_string);
 */
 
 //
-//bool nca_decrypt_key_area(const NcaHeader_t *header, NcaKeyArea_t *out);
+void nca_update_lower_ctr(uint8_t *ctr, uint64_t offset);
+void nca_update_upper_ctr(uint8_t *ctr, uint64_t offset);
+
+//
+bool nca_decrypt_keak(const NcaHeader_t *header, NcaKeyArea_t *out);
+bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen);
 
 //
 bool nca_encrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header);
-
-//
 bool nca_decrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header);
 
 //
 bool nca_get_header(FILE *fp, uint64_t offset, NcaHeader_t *header);
-
-//
 bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header);
 
 
@@ -269,15 +245,18 @@ bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header);
 */
 
 //
-int nca_read(void *in);
-
-//
-int nca_write(void *in);
-
-//
 bool nca_setup_placeholder(NcmInstall_t *out, size_t size, NcmContentId *content_id, NcmStorageId storage_id);
 
 //
-bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id);
+bool nca_start_install(NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp);
+
+
+/*
+*   Debug
+*/
+
+//
+void nca_print_header(const NcaHeader_t *header);
+void nca_print_key_area(const NcaKeyArea_t *keak);
 
 #endif

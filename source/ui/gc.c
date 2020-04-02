@@ -1,8 +1,21 @@
+/*
+*   This code is bad.
+*   Don't read it.
+*   It works, that's all that matters.
+*
+*   I'll clean it up one day. Today is not that day.
+*/
+
+
+#include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include <switch.h>
 
 #include "ui/gc.h"
 #include "ui/menu.h"
+#include "ui/settings.h"
 
 #include "nx/fs.h"
 #include "nx/ns.h"
@@ -10,6 +23,8 @@
 #include "nx/ncm.h"
 #include "nx/cnmt.h"
 #include "nx/set.h"
+#include "nx/crypto.h"
+#include "nx/es.h"
 
 #include "gfx/image.h"
 #include "gfx/text.h"
@@ -23,21 +38,19 @@
 
 typedef struct
 {
-    char cnmt[0x30];
-    uint64_t title_id;
-    size_t size;
-    uint8_t key_gen;
-} gc_cnmt_t;
+    uint64_t id;
 
+    uint16_t base_total;
+    uint16_t upp_total;
+    uint16_t dlc_total;
+} sort_t;
+
+bool g_gamecard_mounted = false;
+uint16_t g_game_pos = 0;
+GameCard_t GAMECARD = {0};
 
 FsDeviceOperator g_dop = {0};
 FsGameCardHandle g_gc_handle = {0};
-char g_gc_mount_path[0x10] = {0};
-
-// max games per gc is 16.
-gc_cnmt_t gc_cnmt[0x10] = {0};
-uint8_t g_cnmt_total = 0;
-uint8_t g_curr_game = 0;
 
 
 bool init_gc(void)
@@ -45,7 +58,7 @@ bool init_gc(void)
     if (!fs_open_device_operator(&g_dop))
     {
         write_log("failed to mount gcop\n");
-        ui_display_error_box(ErrorCode_Init_Gc);
+        ui_display_error_box(ErrorCode_Init_Gc, __func__);
         return false;
     }
     return true;
@@ -53,293 +66,853 @@ bool init_gc(void)
 
 void exit_gc(void)
 {
+    gc_unmount();
     fs_close_device_operator(&g_dop);
-    fs_close_gamecard_handle(&g_gc_handle);
-    fs_unmount_device(g_gc_mount_path);
 }
 
-bool poll_gc(void)
+bool gc_poll(void)
 {
     return fs_is_gamecard_inserted(&g_dop);
 }
 
-bool setup_gamecard(GameCard_t *gamecard, gc_cnmt_t *gc_cnmt)
+
+/*
+*   GameCard Mount / Unmount.
+*/
+
+bool __gc_setup_file_tabel(GameCard_t *gamecard)
 {
-    struct dirent *d = {0};
-    DIR *dir = open_dir(".");
-    if (!dir)
+    if (!gamecard)
     {
-        write_log("failed to open dir %s\n", ".");
-        ui_display_error_box(ErrorCode_Dir_Setup);
-        fs_unmount_device(g_gc_mount_path);
+        write_log("missing args in %s\n", __func__);
         return false;
     }
 
-    while ((d = readdir(dir)))
+    DIR *dir = opendir(".");
+    struct dirent *d = {0};
+    if (!dir)
     {
-        FILE *fp = fopen(d->d_name, "rb");
-        if (!fp)
-        {
-            write_log("failed to somehow open file in gamecard %s\n", d->d_name);
-            ui_display_error_box(ErrorCode_File_Setup);
-            closedir(dir);
-            fs_unmount_device(g_gc_mount_path);
-            return false;
-        }
-
-        // get the nca header, decrypt it to get the nca size.
-        NcaHeader_t header = {0};
-        nca_get_header_decrypted(fp, 0, &header);
-        fclose(fp);
-
-        // check if this file belongs to this cnmt.
-        if (header.title_id != gc_cnmt->title_id)
-        {
-            continue;
-        }
-
-        // add the size of the nca.
-        gamecard->size += header.size;
-
-        // we need to get info on the game from at least one of the nca's.
-        // It can be any nca header.
-        if (header.content_type == NcaContentType_Meta)
-        {
-            // get the app_id.
-            gamecard->app_id = ncm_get_app_id_from_title_id(header.title_id, NcmContentMetaType_Application);
-            gamecard->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", gamecard->app_id);
-            gamecard->key_gen = header.key_gen ? header.key_gen : header.old_key_gen;
-            gamecard->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %s", nca_return_key_gen_string(gamecard->key_gen));
-            strncpy(gamecard->cnmt_name, d->d_name, 0x100);
-            
-            NsApplicationControlData control_data = {0};
-            if (ns_get_app_control_data(&control_data, gamecard->app_id))
-            {
-                gamecard->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
-                gamecard->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
-                gamecard->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
-            }
-        }
+        write_log("failed to open folder %s\n", __func__);
+        return false;
     }
 
-    gamecard->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 585, Colour_Nintendo_White, "Size: %.2fGB", (float)gamecard->size / 0x40000000);
+    memset(&gamecard->file_table, 0, sizeof(GameCardFileTable_t));
+    
+    while ((d = readdir(dir)))
+    {
+        char *found = strchr(d->d_name, '.');
+        if (strcmp(found, ".cnmt.nca") == 0)
+            gamecard->file_table.cnmt_count++;
+        else if (strcmp(found, ".nca") == 0)
+            gamecard->file_table.nca_count++;
+        else if (strcmp(found, ".tik") == 0)
+            gamecard->file_table.tik_count++;
+        else if (strcmp(found, ".cert") == 0)
+            gamecard->file_table.cert_count++;
+        gamecard->file_table.file_count++;
+    }
+    closedir(dir);
+    return true;
+}
+
+bool __gc_setup_string_table(GameCard_t *gamecard)
+{
+    if (!gamecard)
+    {
+        write_log("missing args in %s\n", __func__);
+        return false;
+    }
+
+    gamecard->string_table = calloc(gamecard->file_table.file_count, sizeof(GameCardStringTable_t));
+    if (!gamecard->string_table)
+    {
+        write_log("no file table");
+        return false;
+    }
+
+    DIR *dir = opendir(".");
+    struct dirent *d = {0};
+    if (!dir)
+    {
+        write_log("failed to open folder %s\n", __func__);
+        return false;
+    }
+
+    uint16_t i = 0;
+    while ((d = readdir(dir)) && i < gamecard->file_table.file_count)
+    {
+        strcpy(gamecard->string_table[i].name, d->d_name);
+        write_log("table %s\n", gamecard->string_table[i].name);
+        i++; 
+    }
+
     closedir(dir);
 
     return true;
 }
 
-bool save_cnmt_path(void)
+bool __id_match_check(sort_t *sorts, uint16_t count, uint16_t *pos, uint64_t id, NcmContentMetaType type)
 {
-    struct dirent *d = NULL;
-    DIR *dir = open_dir(".");
-    if (!dir)
+    for (uint16_t i = 0; i < count; i++)
     {
-        write_log("failed to open dir %s\n", ".");
-        ui_display_error_box(ErrorCode_Dir_Cnmt);
+        if (sorts[i].id == ncm_get_app_id_from_title_id(id, type))
+        {
+            *pos = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+
+bool __idk_what_to_call_this(sort_t *sorts, uint16_t pos, NcmContentMetaType type)
+{
+    if (!sorts)
+    {
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
-    uint8_t i = 0;
-    while ((d = readdir(dir)))
+    switch (type)
     {
-        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
-            continue;
-
-        if (strstr(d->d_name, "cnmt.nca"))
-        {
-            FILE *fp = fopen(d->d_name, "rb");
-            if (!fp)
-            {
-                write_log("failed to somehow open file in gamecard %s\n", d->d_name);
-                ui_display_error_box(ErrorCode_File_Cnmt);
-                closedir(dir);
-                return false;
-            }
-
-            // get the nca header, decrypt it to get the nca size.
-            NcaHeader_t header = {0};
-            nca_get_header_decrypted(fp, 0, &header);
-            fclose(fp);
-
-            // save the cnmt info.
-            gc_cnmt[i].title_id = header.title_id;
-            gc_cnmt[i].size = header.size;
-            strcpy(gc_cnmt[i].cnmt, d->d_name);
-            i++;
-        }
+        case NcmContentMetaType_Application:
+            sorts[pos].base_total++;
+            return true;
+        case NcmContentMetaType_Patch:
+            sorts[pos].upp_total++;
+            return true;
+        case NcmContentMetaType_AddOnContent:
+            sorts[pos].dlc_total++;
+            return true;
+        default:
+            write_log("got incorrect ncm_meta_type: %u\n", type);
+            return false;
     }
+}
+
+bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_t key_gen, uint16_t pos, NcmContentMetaType type)
+{
+    if (!entries || !cnmt)
+    {
+        write_log("missing params in __gc_sort_cnmt\n");
+        return false;
+    }
+
+    switch (type)
+    {
+        case NcmContentMetaType_Application:
+            memcpy(&GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt, cnmt, sizeof(Cnmt_t));
+            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.content_infos, GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].key_gen = key_gen;
+            GAMECARD.entries[pos].base_count++;
+            break;
+        case NcmContentMetaType_Patch:
+            memcpy(&GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt, cnmt, sizeof(Cnmt_t));
+            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.content_infos, GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].key_gen = key_gen;
+            GAMECARD.entries[pos].upp_count++;
+            break;
+        case NcmContentMetaType_AddOnContent:
+            memcpy(&GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt, cnmt, sizeof(Cnmt_t));
+            GAMECARD.entries[pos].total_size += ncm_calculate_content_infos_size(GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.content_infos, GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].key_gen = key_gen;
+            GAMECARD.entries[pos].dlc_count++;
+            break;
+        default:
+            write_log("got incorrect ncm_meta_type: %u\n", type);
+            return false;
+    }
+
     return true;
 }
 
-bool mount_gc(GameCard_t *gamecard)
+bool __gc_parse_cnmt(void)
+{
+    // get the total cnmt.nca.
+    if (!__gc_setup_file_tabel(&GAMECARD))
+    {
+        //TODO
+        return false;
+    }
+
+    if (!GAMECARD.file_table.cnmt_count)
+    {
+        write_log("no cnmt's found!? How on earth is that possible\n");
+        ui_display_error_box(ErrorCode_Mount_NoMeta, __func__);
+        return false;
+    }
+
+    if (!__gc_setup_string_table(&GAMECARD))
+    {
+        //TODO
+        return false;
+    }
+
+
+    Cnmt_t *cnmt = calloc(GAMECARD.file_table.cnmt_count, sizeof(Cnmt_t));
+    if (!cnmt)
+    {
+        write_log("failed to alloc cnmt\n");
+        ui_display_error_box(ErrorCode_Alloc, __func__);
+        return false;
+    }
+
+    sort_t *sorts = calloc(GAMECARD.file_table.cnmt_count, sizeof(sort_t));
+    if (!sorts)
+    {
+        write_log("failed to alloc sorts\n");
+        free(cnmt);
+        ui_display_error_box(ErrorCode_Alloc, __func__);
+        return false;
+    }
+
+    uint8_t *key_gens = calloc(GAMECARD.file_table.cnmt_count, sizeof(uint8_t));
+    if (!key_gens)
+    {
+        write_log("failed to alloc key_gens\n");
+        free(sorts);
+        free(cnmt);
+        ui_display_error_box(ErrorCode_Alloc, __func__);
+        return false;
+    }
+
+    // lets get each cnmt and parse it.
+    for (uint16_t i = 0, j = 0; i < GAMECARD.file_table.file_count && j < GAMECARD.file_table.cnmt_count; i++)
+    {
+        // we only want cnmt.nca.
+        if (!strstr(GAMECARD.string_table[i].name, "cnmt.nca"))
+        {
+            continue;
+        }
+
+        // open cnmt.nca
+        FILE *fp = fopen(GAMECARD.string_table[i].name, "rb");
+        if (!fp)
+        {
+            write_log("failed to open %s\n", GAMECARD.string_table[i].name);
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            ui_display_error_box(ErrorCode_OpenFile, __func__);
+            return false;
+        }
+
+        // get the decrypted header.
+        NcaHeader_t header = {0};
+        if (!nca_get_header_decrypted(fp, 0, &header))
+        {
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(fp);
+            ui_display_error_box(ErrorCode_DecryptNcaHeader, __func__);
+            return false;
+        }
+        nca_print_header(&header);
+
+        // sort keygen.
+        key_gens[j] = header.key_gen ? header.key_gen : header.old_key_gen;
+
+        // check if we can decrypt the keak.
+        if (!crypto_has_key_gen(header.kaek_index, key_gens[j]))
+        {
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(fp);
+            ui_display_error_box(ErrorCode_KeyGen, __func__);
+        }
+
+        // decrypt the keak. (cnmt.nca are always standard crypto).
+        NcaKeyArea_t decrypted_key = {0};
+        if (!nca_decrypt_keak(&header, &decrypted_key))
+        {
+            write_log("failed to decrypt stuff\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(fp);
+            ui_display_error_box(ErrorCode_DecryptNcaKeak, __func__);
+            return false;
+        }
+
+        // ensure that the first cnmt section is pfs0 (should always be true).
+        if (header.section_header[0].fs_type != NcaFileSystemType_PFS0)
+        {
+            write_log("cnmt section 0 is not a pfs0!\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(fp);
+    
+            ui_display_error_box(ErrorCode_WrongFsType, __func__);
+            return false;
+        }
+
+        // calc the offset.
+        uint64_t section_offset = MEDIA_REAL(header.section_table[0].media_start_offset);
+
+        // read section (pfs0 is always the first and only(?) section for a cnmt.nca)
+        void *pfs0_data = calloc(1, header.section_header[0].pfs0_sb.pfs0_size);
+        if (!pfs0_data)
+        {
+            write_log("failed to alloc pfs0_data\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(fp);
+    
+            ui_display_error_box(ErrorCode_Alloc, __func__);
+            return false;
+        }
+
+        read_file(pfs0_data, header.section_header[0].pfs0_sb.pfs0_size, (section_offset + header.section_header[0].pfs0_sb.pfs0_offset), fp);
+        fclose(fp);
+
+        // decrypt section
+        uint8_t ctr[0x10] = {0};
+        crypto_aes_ctr(pfs0_data, pfs0_data, decrypted_key.area, ctr, header.section_header[0].pfs0_sb.pfs0_size, section_offset + header.section_header[0].pfs0_sb.pfs0_offset);
+
+        // using fmemopen because i havent yet re-wrote the pfs0 section yet (works fine anyway).
+        FILE *pfs0_fp = fmemopen(pfs0_data, header.section_header[0].pfs0_sb.pfs0_size, "r");
+        if (!pfs0_fp)
+        {
+            write_log("failed to open cnmt data stream as a file\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            ui_display_error_box(ErrorCode_OpenFile, __func__);
+            return false;
+        }
+
+        pfs0_struct_ptr ptr = {0};
+        if (!pfs0_process(&ptr, 0, pfs0_fp))
+        {
+            write_log("failed to process pfs0\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            fclose(pfs0_fp);
+            free(pfs0_data);
+    
+            ui_display_error_box(ErrorCode_Pfs0Prase, __func__);
+            return false;
+        }
+
+        fclose(pfs0_fp);
+
+        if (ptr.header.total_files > 1)
+        {
+            write_log("WARNING: More than one file found in cnmt pfs0\n");
+        }
+
+        NcmContentInfo cnmt_info = {0};
+        memcpy(cnmt_info.size, &header.size, 0x6);
+        cnmt_info.content_id = nca_get_id_from_string(GAMECARD.string_table[i].name);
+        cnmt_info.content_type = NcmContentType_Meta;
+        cnmt_info.id_offset = 0;
+
+        if (!cnmt_parse(pfs0_data, ptr.raw_data_offset + ptr.file_table[0].data_offset, &cnmt_info, &cnmt[j]))
+        {
+            write_log("failed to parse cnmt\n");
+            free(key_gens);
+            free(cnmt);
+            free(sorts);
+            free(pfs0_data);
+    
+            ui_display_error_box(ErrorCode_CnmtPrase, __func__);
+            return false;
+        }
+
+        // add stuff to sorts
+        uint16_t pos = 0;
+        if (__id_match_check(sorts, GAMECARD.file_table.game_count, &pos, cnmt[j].key.id, cnmt[j].key.type))
+        {
+            __idk_what_to_call_this(sorts, pos, cnmt[j].key.type);
+        }
+        else
+        {
+            __idk_what_to_call_this(sorts, GAMECARD.file_table.game_count, cnmt[j].key.type);
+            sorts[GAMECARD.file_table.game_count].id = ncm_get_app_id_from_title_id(cnmt[j].key.id, cnmt[j].key.type);
+            GAMECARD.file_table.game_count++;
+        }
+
+        pfs0_free_structs(&ptr);
+        free(pfs0_data);
+        j++;
+    }
+
+    GAMECARD.entries = calloc(GAMECARD.file_table.game_count, sizeof(GameCardGameEntries_t));
+    if (!GAMECARD.entries)
+    {
+        ui_display_error_box(ErrorCode_Alloc, __func__);
+        write_log("failed to alloc entries\n");
+        free(key_gens);
+        free(sorts);
+        free(cnmt);
+        return false;
+    }
+
+    for (uint16_t i = 0; i < GAMECARD.file_table.game_count; i++)
+    {
+        if (sorts[i].base_total)
+        {
+            GAMECARD.entries[i].base = calloc(sorts[i].base_total, sizeof(GameCardEntry_t));
+            if (!GAMECARD.entries[i].base)
+            {
+                ui_display_error_box(ErrorCode_Alloc, __func__);
+                write_log("failed to alloc entry base: %u\n", i);
+                free(key_gens);
+                free(sorts);
+                free(cnmt);
+                return false;
+            }
+        }
+        if (sorts[i].upp_total)
+        {
+            GAMECARD.entries[i].upp = calloc(sorts[i].upp_total, sizeof(GameCardEntry_t));
+            if (!GAMECARD.entries[i].upp)
+            {
+                ui_display_error_box(ErrorCode_Alloc, __func__);
+                write_log("failed to alloc entry upp: %u\n", i);
+                free(key_gens);
+                free(sorts);
+                free(cnmt);
+                return false;
+            }
+        }
+        if (sorts[i].dlc_total)
+        {
+            GAMECARD.entries[i].dlc = calloc(sorts[i].dlc_total, sizeof(GameCardEntry_t));
+            if (!GAMECARD.entries[i].dlc)
+            {
+                ui_display_error_box(ErrorCode_Alloc, __func__);
+                write_log("failed to alloc entry dlc: %u\n", i);
+                free(key_gens);
+                free(sorts);
+                free(cnmt);
+                return false;
+            }
+        }
+    }
+
+    for (uint16_t i = 0; i < GAMECARD.file_table.cnmt_count; i++)
+    {
+        uint16_t pos = 0;
+        if (!__id_match_check(sorts, GAMECARD.file_table.game_count, &pos, cnmt[i].key.id, cnmt[i].key.type))
+        {
+            write_log("\n\nWARNING. __id_match_check failed: %u\n\n", i);
+        }
+        __gc_setup_entry(GAMECARD.entries, &cnmt[i], key_gens[i], pos, cnmt[i].key.type);
+    }
+
+    for (uint16_t i = 0; i < GAMECARD.file_table.game_count; i++)
+    {
+        write_log("game %u: base: %u upp: %u dlc: %u\n", i, GAMECARD.entries[i].base_count, GAMECARD.entries[i].upp_count, GAMECARD.entries[i].dlc_count);
+    }
+
+    free(key_gens);
+    free(sorts);
+    free(cnmt);
+
+    return true;
+}
+
+bool gc_mount(void)
 {
     if (!fs_get_gamecard_handle_from_device_operator(&g_dop, &g_gc_handle))
     {
         write_log("failed to get gc handle\n");
-        ui_display_error_box(ErrorCode_Mount_Handle);
+        ui_display_error_box(ErrorCode_Mount_Handle, __func__);
         return false;
     }
 
-    if (!fs_mount_gamecard_partition(g_gc_mount_path, &g_gc_handle, FsGameCardPartition_Secure))
+    if (!fs_mount_gamecard_secure(&g_gc_handle))
     {
         write_log("failed to mount gc\n");
-        ui_display_error_box(ErrorCode_Mount_Partition);
+        ui_display_error_box(ErrorCode_Mount_Secure, __func__);
         return false;
     }
 
-    if (!change_dir("%s%s", g_gc_mount_path, ":/"))
+    if (!change_dir("%s%s", GAMECARD_MOUNT_SECURE, ":/"))
     {
         write_log("failed to change path to gc\n");
-        ui_display_error_box(ErrorCode_Mount_Chdir);
-        fs_unmount_device(g_gc_mount_path);
+        ui_display_error_box(ErrorCode_Mount_Chdir, __func__);
+        fs_unmount_device(GAMECARD_MOUNT_SECURE);
         return false;
     }
 
-    g_cnmt_total = get_dir_total_filter(".", "cnmt.nca");
-    if (!g_cnmt_total)
-    {
-        write_log("no cnmt's found!? How on earth is that possible\n");
-        ui_display_error_box(ErrorCode_Mount_NoMeta);
-        fs_unmount_device(g_gc_mount_path);
-        return false;
-    }
-
-    if (!save_cnmt_path())
-    {
-        write_log("failed to save the paths of the cnmt's\n");
-        ui_display_error_box(ErrorCode_Mount_Cnmt);
-        fs_unmount_device(g_gc_mount_path);
-        return false;
-    }
-
-    return setup_gamecard(gamecard, &gc_cnmt[g_curr_game]);
+    return __gc_parse_cnmt();
 }
 
-void swap_game_in_gc(GameCard_t *gamecard)
+bool gc_unmount(void)
 {
-    // theres no need to swap if theres only one game in the gc.
-    if (g_cnmt_total == 1)
+    fs_unmount_device(GAMECARD_MOUNT_SECURE);
+    fs_close_gamecard_handle(&g_gc_handle);
+
+    if (GAMECARD.entries)
+    {
+        for (uint16_t i = 0; i < GAMECARD.file_table.game_count; i++)
+        {
+            if (GAMECARD.entries[i].base_count && GAMECARD.entries[i].base)
+            {
+                free(GAMECARD.entries[i].base);
+            }
+            if (GAMECARD.entries[i].upp_count && GAMECARD.entries[i].upp)
+            {
+                free(GAMECARD.entries[i].upp);
+            }
+            if (GAMECARD.entries[i].dlc_count && GAMECARD.entries[i].dlc)
+            {
+                free(GAMECARD.entries[i].dlc);
+            }
+        }
+        free(GAMECARD.entries);
+    }
+    if (GAMECARD.string_table)
+    {
+        free(GAMECARD.string_table);
+        GAMECARD.string_table = NULL;
+    }
+
+    memset(&GAMECARD, 0, sizeof(GameCard_t));
+    g_game_pos = 0;
+    change_dir("sdmc:/");
+    return true;
+}
+
+
+/*
+*   GameCard Getters.
+*/
+
+uint16_t gc_get_game_count(void)
+{
+    return GAMECARD.file_table.game_count;
+}
+
+uint16_t gc_get_base_count(uint16_t game_pos)
+{
+    return GAMECARD.entries[game_pos].base_count;
+}
+
+uint16_t gc_get_upp_count(uint16_t game_pos)
+{
+    return GAMECARD.entries[game_pos].upp_count;
+}
+
+uint16_t gc_get_dlc_count(uint16_t game_pos)
+{
+    return GAMECARD.entries[game_pos].dlc_count;
+}
+
+uint16_t gc_get_current_base_count(void)
+{
+    return GAMECARD.entries[g_game_pos].base_count;
+}
+
+uint16_t gc_get_current_upp_count(void)
+{
+    return GAMECARD.entries[g_game_pos].upp_count;
+}
+
+uint16_t gc_get_current_dlc_count(void)
+{
+    return GAMECARD.entries[g_game_pos].dlc_count;
+}
+
+
+/*
+*   Change GameInfo.
+*/
+
+bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
+{
+    if (!out_info || game_pos >= GAMECARD.file_table.game_count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    out_info->app_id = ncm_get_app_id_from_title_id(GAMECARD.entries[game_pos].base[0].cnmt.key.id, GAMECARD.entries[game_pos].base[0].cnmt.key.type);
+    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 505, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
+    enable_text_clip(out_info->text_app_id, 0, 325);
+    out_info->key_gen = GAMECARD.entries[game_pos].base[0].key_gen;
+    out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 545, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
+    enable_text_clip(out_info->text_key_gen, 0, 325);
+    out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 585, Colour_Nintendo_White, "Size: %.2fGB", (float)GAMECARD.entries[game_pos].total_size / 0x40000000);
+    enable_text_clip(out_info->text_size, 0, 325);
+
+    NsApplicationControlData control_data = {0};
+    if (ns_get_app_control_data(&control_data, out_info->app_id))
+    {
+        out_info->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
+        out_info->title = create_text(&FONT_TEXT[QFontSize_18], 50, 425, Colour_Nintendo_White, control_data.nacp.lang[0].name);
+        enable_text_clip(out_info->title, 0, 325);
+        out_info->author = create_text(&FONT_TEXT[QFontSize_18], 50, 465, Colour_Nintendo_White, control_data.nacp.lang[0].author);
+        enable_text_clip(out_info->author, 0, 325);
+    }
+    return true;
+}
+
+bool gc_next_game(GameInfo_t *info_out)
+{
+    if (!info_out)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    if (GAMECARD.file_table.game_count == 0)
+    {
+        return true;
+    }
+
+    g_game_pos = g_game_pos == GAMECARD.file_table.game_count - 1 ? 0 : g_game_pos + 1;
+    return gc_setup_game_info(info_out, g_game_pos);
+}
+
+bool gc_prev_game(GameInfo_t *info_out)
+{
+    if (!info_out)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    if (GAMECARD.file_table.game_count == 0)
+    {
+        return true;
+    }
+
+    g_game_pos = g_game_pos == 0 ? GAMECARD.file_table.game_count - 1 : g_game_pos - 1;
+    return gc_setup_game_info(info_out, g_game_pos);
+}
+
+bool gc_change_game(GameInfo_t *info_out, uint16_t game_pos)
+{
+    if (!info_out)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    if (game_pos >= GAMECARD.file_table.game_count)
+    {
+        write_log("cannot swap game, pos too high %s\n", __func__);
+        return true;
+    }
+
+    g_game_pos = game_pos;
+    return gc_setup_game_info(info_out, g_game_pos);
+}
+
+
+/*
+*   GameCard Install.
+*/
+
+void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *entry)
+{
+    /*
+    *   I've stopped caring about code quality now.
+    */
+
+    // check if we have any tickets.
+    if (!gamecard->file_table.tik_count || !gamecard->file_table.cert_count)
     {
         return;
     }
-    
-    reset_gc(gamecard);
-    g_curr_game = g_cnmt_total == (g_curr_game + 1) ? 0 : g_curr_game + 1;
-    setup_gamecard(gamecard, &gc_cnmt[g_curr_game]);
-}
 
-void reset_gc(GameCard_t *gamecard)
-{
-    free_image(gamecard->icon);
-    free_text(gamecard->title);
-    free_text(gamecard->author);
-    free_text(gamecard->text_size);
-    free_text(gamecard->text_key_gen);
-    free_text(gamecard->text_app_id);
-    memset(gamecard, 0, sizeof(GameCard_t));
-}
+    bool found_tik = false;
+    bool found_cert = false;
+    uint16_t tik_pos = 0;
+    uint16_t cert_pos = 0;
 
-bool unmount_gc(GameCard_t *gamecard)
-{
-    fs_close_gamecard_handle(&g_gc_handle);
-    fs_unmount_device(g_gc_mount_path);
-    g_cnmt_total = 0;
-    memset(g_gc_mount_path, 0, sizeof(g_gc_mount_path));
-    memset(gc_cnmt, 0, sizeof(gc_cnmt_t));
-    reset_gc(gamecard);
-    change_dir("sdmc:/");
-    fs_close_device_operator(&g_dop);
-    fs_open_device_operator(&g_dop);
-    return true;
-}
+    char str_id[0x11] = {0};
+    snprintf(str_id, 0x11, "%016lx", (entry->cnmt.key.id));
 
-#include "nx/crypto.h"
-#include "nx/lbl.h"
-bool install_gc(GameCard_t *gamecard, NcmStorageId storage_id)
-{
-    if (!gamecard)
+    for (uint16_t i = 0; i < gamecard->file_table.file_count; i++)
     {
-        write_log("gamecard is null? failed to install\n");
-        ui_display_error_box(ErrorCode_Install_Null);
+        char *ext = strchr(gamecard->string_table[i].name, '.');
+        if (!ext)
+        {
+            continue;
+        }
+        if (strcmp(ext, ".tik") == 0 && strstr(gamecard->string_table[i].name, str_id))
+        {
+            write_log("found ticket\n");
+            tik_pos = i;
+            found_tik = true;
+        }
+        else if (strcmp(ext, ".cert") == 0 && strstr(gamecard->string_table[i].name, str_id))
+        {
+            write_log("found cert\n");
+            cert_pos = i;
+            found_cert = true;
+        }
+    }
+
+    if (found_tik && found_cert)
+    {
+        write_log("INSTALLING TICKET\n");
+
+        size_t tik_size = 0;
+        size_t cert_size = 0;
+
+        void *tik_buf = load_file_into_mem(gamecard->string_table[tik_pos].name, &tik_size);
+        void *cert_buf = load_file_into_mem(gamecard->string_table[cert_pos].name, &cert_size);
+
+        if (!tik_buf) write_log("no tik buf\n");
+        if (!tik_size) write_log("no tik size\n");
+        if (!cert_buf) write_log("no cert buf\n");
+        if (!cert_size) write_log("no tik size\n");
+
+        es_import_tik_and_cert(tik_buf, tik_size, cert_buf, cert_size);
+        free(tik_buf);
+        free(cert_buf);
+    }
+
+    return;
+}
+
+bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
+{
+    if (!entry)
+    {
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
+    // add a settings option to make this optional.
+    cnmt_set_extended_header(entry->cnmt.extended_header, entry->cnmt.key.type);
+
+    // set the db and push record.
+    if (!cnmt_set_db(&entry->cnmt.key, &entry->cnmt.header, entry->cnmt.extended_header, entry->cnmt.content_infos, storage_id))
+    {
+        return false;
+    }
+    if (!cnmt_push_record(&entry->cnmt.key, storage_id))
+    {
+        return false;
+    }
+
+    // clear unused data after pushing record.
+    // ie, installing v2 over v1. v1 will still exist in ncm, this will delete it.
+    // can be done manually, and will be done so soon.
+    // this will also fix mistakes from bad installers that do not clean up left over ncas.
+    // *wink wink*.
+    nsDeleteRedundantApplicationEntity();
+
+    for (uint16_t i = 0; i < entry->cnmt.header.content_count; i++)
+    {
+        // TODO: add check to make sure that the nca is in the filetable.
+        char nca_name_buffer[0x301] = {0};
+        snprintf(nca_name_buffer, 0x301, "%s%s", nca_get_string_from_id(&entry->cnmt.content_infos[i].content_id, nca_name_buffer), entry->cnmt.content_infos[i].content_type == NcmContentType_Meta ? ".cnmt.nca" : ".nca");
+        FILE *fp = fopen(nca_name_buffer, "rb");
+        if (!fp)
+        {
+            write_log("failed to open: %s\n", nca_name_buffer);
+            return false;
+        }
+        if (!nca_start_install(&entry->cnmt.content_infos[i].content_id, 0, storage_id, fp))
+        {
+            write_log("failed to install: %s\n", nca_name_buffer);
+            fclose(fp);
+            return false; 
+        }
+        fclose(fp);
+    }
+
+    return true;
+}
+
+bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
+{
     if (storage_id != NcmStorageId_BuiltInUser && storage_id != NcmStorageId_SdCard)
     {
-        write_log("got wrong storage id %u\n", storage_id);
-        ui_display_error_box(ErrorCode_Install_Storage);
+        write_log("got wrong storage id %u %s\n", storage_id, __func__);
         return false;
     }
-    
-    if (ns_get_storage_free_space(storage_id) <= gamecard->size)
+
+    /*
+    *   Get the override install location from settings.
+    *   TODO: actually implement this into the settings menu.
+    */
+    SettingsInstallLocation base_location = setting_get_install_base_location();
+    if (base_location == SettingsInstallLocation_Default) base_location = storage_id;
+    SettingsInstallLocation upp_location = setting_get_install_upp_location();
+    if (upp_location == SettingsInstallLocation_Default) upp_location = storage_id;
+    SettingsInstallLocation dlc_location = setting_get_install_dlc_location();
+    if (dlc_location == SettingsInstallLocation_Default) dlc_location = storage_id;
+
+    // TODO: calculate install size.
+    // user might only want to install dlc.
+    // loop through dlc and add the size.
+    if (ns_get_storage_free_space(storage_id) <= GAMECARD.entries[game_pos].total_size)
     {
         write_log("not enough free space.\n");
-        ui_display_error_box(ErrorCode_Install_NoSpace);
+        ui_display_error_box(ErrorCode_NoSpace, __func__);
         return false;
     }
 
-    if (get_sys_fw_version() < nca_return_key_gen_int(gamecard->key_gen ? gamecard->key_gen - 1 : gamecard->key_gen) && !is_lower_key_gen_enabled())
+    /*
+    *   Actually installing stuff now.
+    *   Loop though array.
+    */
+
+    // base.
+    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].base_count && setting_get_install_base() == SettingFlag_On; i++)
     {
-        if (!has_keys() || !has_key_gen(gamecard->key_gen) || !ui_display_yes_no_box("The game has a higher keygen. Enable lower keygen?"))
+        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].base[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
         {
-            write_log("Too low of a fw version to install this game\n");
-            ui_display_error_box(ErrorCode_Install_KeyGen);
+            continue;
+        }
+
+        if (!__gc_install(&GAMECARD.entries[game_pos].base[i], base_location))
+        {
             return false;
         }
 
-        set_lower_key_gen(true);
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].base[i]);
     }
 
-    if (!is_bl_enabled())
+    // upp.
+    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].upp_count && setting_get_install_upp() == SettingFlag_On; i++)
     {
-        disable_backlight(BacklightFade_Slow);
-    }
-
-    if (R_FAILED(appletSetMediaPlaybackState(true)))
-    {
-        write_log("couldnt set media playback state\n");
-    }
-
-    write_log("getting content id from cmnt name\n");
-    NcmContentId content_id = nca_get_id_from_string(gamecard->cnmt_name);
-
-    if (!nca_start_install(&content_id, storage_id))
-    {
-        write_log("failed to install nca\n");
-        ui_display_error_box(ErrorCode_Install_CnmtNca);
-        appletSetMediaPlaybackState(false);
-        return false;
-    }
-
-    CnmtContentInfos_t infos = {0};
-
-    if (!cnmt_open(&content_id, storage_id, &infos))
-    {
-        write_log("failed to install cnmt\n");
-        ui_display_error_box(ErrorCode_Install_Cnmt);
-        appletSetMediaPlaybackState(false);
-        return false;
-    }
-
-    for (uint16_t i = 1; i < infos.info_count; i++)
-    {
-        if (!nca_start_install(&infos.content_infos[i].content_id, storage_id))
+        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].upp[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
         {
-            write_log("failed to install nca\n");
-            ui_display_error_box(ErrorCode_Install_Nca);
-            free(infos.content_infos);
-            appletSetMediaPlaybackState(false);
+            continue;
+        }
+
+        if (!__gc_install(&GAMECARD.entries[game_pos].upp[i], upp_location))
+        {
             return false;
         }
-    }
-    
-    free(infos.content_infos);
 
-    appletSetMediaPlaybackState(false);
-    if (!is_bl_enabled())
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].upp[i]);
+    }
+
+    // dlc.
+    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].dlc_count && setting_get_install_dlc() == SettingFlag_On; i++)
     {
-        enable_backlight(BacklightFade_Fast);
+        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].dlc[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+        {
+            continue;
+        }
+
+        if (!__gc_install(&GAMECARD.entries[game_pos].dlc[i], dlc_location))
+        {
+            return false;
+        }
+
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].dlc[i]);
     }
 
     return true;
+}
+
+bool gc_install(NcmStorageId storage_id)
+{
+    return gc_install_ex(g_game_pos, storage_id);
 }

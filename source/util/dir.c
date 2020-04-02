@@ -10,6 +10,7 @@
 
 #include "util/dir.h"
 #include "util/file.h"
+#include "util/log.h"
 
 
 DIR *open_dir(const char *directory)
@@ -29,15 +30,14 @@ bool is_dir(const char *folder_to_check)
 bool check_if_dir_exists(const char *directory)
 {
     DIR *dir = opendir(directory);
-    if (!dir)
-        return false;
+    if (!dir) return false;
     closedir(dir);
     return true;
 }
 
 bool change_dir(const char *path, ...)
 {
-    char full_path[0x400];
+    char full_path[0x301] = {0};
     va_list v;
     va_start(v, path);
     vsprintf(full_path, path, v);
@@ -52,14 +52,14 @@ bool change_dir(const char *path, ...)
 size_t get_dir_total(const char *directory)
 {
     size_t number_of_files = 0;
-    struct dirent *de;
+    struct dirent *d = {0};
     DIR *dir = open_dir(directory);
     if (!dir)
-        return number_of_files;
+        return 0;
 
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
             continue;
         number_of_files++;
     }
@@ -72,17 +72,17 @@ size_t get_dir_size(const char *directory)
 {
     size_t size = 0;
     DIR *dir = open_dir(directory);
-    struct dirent *de;
+    struct dirent *d = {0};
     if (!dir)
-        return size;
+        return 0;
 
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
             continue;
 
         char *full_path;
-        if (!asiprintf(&full_path, "%s/%s", directory, de->d_name))
+        if (!asiprintf(&full_path, "%s/%s", directory, d->d_name))
             return size;
 
         if (is_dir(full_path))
@@ -98,22 +98,22 @@ size_t get_dir_size(const char *directory)
 size_t get_dir_total_recursive(const char *directory)
 {
     size_t num = 0;
-    struct dirent *de;
+    struct dirent *d = {0};
     DIR *dir = open_dir(directory);
     if (!dir)
-        return num;
+        return 0;
         
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
             continue;
 
         char *full_path;
-        if (!asiprintf(&full_path, "%s/%s", directory, de->d_name))
+        if (!asiprintf(&full_path, "%s/%s", directory, d->d_name))
             return num;
 
-        if (is_dir(de->d_name))
-            num += get_dir_total(de->d_name);
+        if (is_dir(d->d_name))
+            num += get_dir_total(d->d_name);
 
         num++;
         free(full_path);
@@ -125,22 +125,22 @@ size_t get_dir_total_recursive(const char *directory)
 size_t get_dir_total_filter(const char *directory, const char *filter)
 {
     size_t num = 0;
-    struct dirent *de;
+    struct dirent *d = {0};
     DIR *dir = open_dir(directory);
     if (!dir)
-        return num;
+        return 0;
         
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
             continue;
 
         char *full_path;
-        if (!asiprintf(&full_path, "%s/%s", directory, de->d_name))
+        if (!asiprintf(&full_path, "%s/%s", directory, d->d_name))
             return num;
 
-        if (is_dir(de->d_name))
-            num += get_dir_total_filter(de->d_name, filter);
+        if (is_dir(d->d_name))
+            num += get_dir_total_filter(d->d_name, filter);
 
         if (strstr(full_path, filter))
             num++;
@@ -151,27 +151,43 @@ size_t get_dir_total_filter(const char *directory, const char *filter)
     return num;
 }
 
+void list_dir(const char *directory)
+{
+    struct dirent *d = {0};
+    DIR *dir = opendir(directory);
+
+    write_log("\nlisting dir\n");
+
+    if (!dir) return;
+    while ((d = readdir(dir)))
+    {
+        write_log("found %s\n", d->d_name);
+    }
+    write_log("finished listing dir\n\n");
+    closedir(dir);
+}
+
 bool create_dir(const char *dir)
 {
     if (check_if_dir_exists(dir))
         return true;
-    return mkdir(dir, 0777) == 0 ? true : false;
+    return mkdir(dir, 0777) == 0;
 }
 
 void delete_dir(const char *directory)
 {
-    struct dirent *de;
+    struct dirent *d = {0};
     DIR *dir = open_dir(directory);
     if (!dir)
         return;
 
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+        if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
             continue;
 
         char *full_path;
-        if (!asiprintf(&full_path, "%s/%s", directory, de->d_name))
+        if (!asiprintf(&full_path, "%s/%s", directory, d->d_name))
             return;
 
         is_dir(full_path) ? delete_dir(full_path) : delete_file(full_path);
@@ -187,25 +203,25 @@ void copy_dir(const char *src, char *dest)
     if (!create_dir(dest))
         return;
         
-    struct dirent *de;
+    struct dirent *d = {0};
     DIR *dir = open_dir(src);
     if (!dir)
         return;
 
-    char buffer[0x200] = {0};
+    char buffer[0x301] = {0};
 
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
-        snprintf(buffer, sizeof(buffer), "%s/%s", dest, de->d_name);
+        snprintf(buffer, sizeof(buffer), "%s/%s", dest, d->d_name);
 
         // check if the file is a directory.
-        if (is_dir(de->d_name))
+        if (is_dir(d->d_name))
         {
             create_dir(buffer);
-            copy_dir(de->d_name, de->d_name);
+            copy_dir(d->d_name, d->d_name);
         }
         else
-            copy_file(de->d_name, buffer);
+            copy_file(d->d_name, buffer);
     }
     closedir(dir);
 }
@@ -213,20 +229,20 @@ void copy_dir(const char *src, char *dest)
 void move_folder(const char *src, char *dest)
 {
     DIR *dir = open_dir(src);
-    struct dirent *de;
+    struct dirent *d = {0};
     create_dir(dest);
 
-    while ((de = readdir(dir)))
+    while ((d = readdir(dir)))
     {
         char *full_path;
-        if (!asiprintf(&full_path, "%s/%s", src, de->d_name))
+        if (!asiprintf(&full_path, "%s/%s", src, d->d_name))
             return;
 
         // check if the file is a directory.
-        if (is_dir(de->d_name))
+        if (is_dir(d->d_name))
             create_dir(full_path);
         else
-            move_file(de->d_name, full_path);
+            move_file(d->d_name, full_path);
 
         free(full_path);
     }

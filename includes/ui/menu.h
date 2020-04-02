@@ -6,7 +6,11 @@
 #include <stdbool.h>
 
 #include "gfx/shape.h"
+#include "gfx/image.h"
 #include "gfx/text.h"
+#include "gfx/SDL_easy.h"
+
+#include "util/error.h"
 
 
 enum
@@ -20,6 +24,20 @@ enum
     Font_Tetris_BL = 0xE026,
     Font_Tetris_L = 0xE027,
 };
+
+// for colour pulsing boxes.
+typedef struct
+{
+    SDL_Colour col;
+    bool increase_blue;
+    uint8_t delay;
+} PulseColour_t;
+
+typedef struct
+{
+    PulseColour_t pulse;
+    SDL_Rect rect;
+} PulseShape_t;
 
 typedef struct
 {
@@ -38,11 +56,23 @@ typedef struct
     uint8_t eta_sec;
 } progress_bar_t;
 
+typedef struct
+{
+    image_t *icon;
+    text_t *title;
+    text_t *author;
+    text_t *text_app_id;
+    text_t *text_key_gen;
+    text_t *text_size;
+
+    uint64_t app_id;
+    uint8_t key_gen;
+    size_t size;
+} GameInfo_t;
+
 
 //
 bool init_menu(void);
-
-//
 void exit_menu(void);
 
 
@@ -50,17 +80,13 @@ void exit_menu(void);
 *
 */
 
+/*
 //
 bool is_lower_key_gen_enabled(void);
-
-//
 bool is_bl_enabled(void);
-
-//
 void set_lower_key_gen(bool on);
-
-//
 void set_bl(bool on);
+*/
 
 
 /*
@@ -71,25 +97,18 @@ void set_bl(bool on);
 void update_button_spin(void);
 
 //
-void ui_display_error_box(uint32_t err);
+void ui_display_error_box(ErrorCodes err, const char *func);
 
 //
 bool ui_display_yes_no_box(const char *message);
 
-// only enabled with DEBUG flag.
-bool ui_display_debug_box(const char * message, ...);
-
 //
 progress_bar_t *ui_init_progress_bar(const char *name, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining);
-
-//
 void ui_free_progress_bar(progress_bar_t *p_bar);
-
-//
 void ui_update_progress_bar(progress_bar_t *p_bar, uint64_t speed, uint16_t eta_min, uint8_t eta_sec, size_t done, size_t remaining);
-
-//
 void ui_display_progress_bar(progress_bar_t *p_bar);
+void ui_display_dim_background(void);
+void ui_draw_highlight_box(PulseShape_t *pulse_shape, int x, int y, int w, int h);
 
 //
 void render_menu(void);

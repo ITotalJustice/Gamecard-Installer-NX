@@ -4,12 +4,14 @@
 
 #include "nx/ivfc.h"
 
+#include "util/log.h"
+
 
 bool ivfc_check_if_magic_valid(uint32_t magic)
 {
     if (magic != IVFC_MAGIC)
     {
-        printf("\ngot wrong magic %u\n", magic);
+        write_log("got wrong ivfc magic %u\n", magic);
         return false;
     }
     return true;

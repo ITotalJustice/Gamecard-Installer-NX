@@ -8,9 +8,11 @@
 
 #include "nx/nca.h"
 #include "nx/ncm.h"
+#include "nx/fs.h"
 #include "nx/crypto.h"
 
 #include "ui/menu.h"
+#include "ui/settings.h"
 
 #include "util/file.h"
 #include "util/log.h"
@@ -27,6 +29,7 @@ typedef struct
 {
     FILE *fp;
     uint8_t *data;
+    uint64_t offset;
     size_t data_size;
     size_t data_read;
     size_t data_written;
@@ -231,15 +234,15 @@ uint16_t nca_return_key_gen_int(uint8_t key_gen)
     }
 }
 
-const char *nca_get_string_from_id(NcmContentId *nca_id, char *out)
+const char *nca_get_string_from_id(const NcmContentId *nca_id, char *out)
 {
     uint64_t nca_id_lower = __bswap64(*(uint64_t *)nca_id->c);
     uint64_t nca_id_upper = __bswap64(*(uint64_t *)(nca_id->c + 0x8));
-    snprintf(out, 0x30, "%016lx%016lx", nca_id_lower, nca_id_upper);
+    snprintf(out, 0x21, "%016lx%016lx", nca_id_lower, nca_id_upper);
     return out;
 }
 
-NcmContentId nca_get_id_from_string(const char *nca_in_string)
+const NcmContentId nca_get_id_from_string(const char *nca_in_string)
 {
     NcmContentId nca_id = {0};
     char lowerU64[0x11] = {0};
@@ -255,7 +258,7 @@ bool nca_encrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header)
 {
     if (!in_header || !out_header)
     {
-        write_log("empty params in nca_encrypt_header\n");
+        write_log("empty params in %s\n", __func__);
         return false;
     }
 
@@ -271,12 +274,13 @@ bool nca_decrypt_header(const NcaHeader_t *in_header, NcaHeader_t *out_header)
 {
     if (!in_header || !out_header)
     {
-        write_log("empty params in nca_decrypt_header\n");
+        write_log("empty params in %s\n", __func__);
         return false;
     }
 
     if (!crypto_aes_xts(in_header, out_header, HEADER_KEY_0, HEADER_KEY_1, 0, NCA_SECTOR_SIZE, NCA_XTS_SECTION_SIZE, EncryptMode_Decrypt))
     {
+        write_log("failed to decrypt nac header\n");
         return false;
     }
 
@@ -287,18 +291,18 @@ bool nca_get_header(FILE *fp, uint64_t offset, NcaHeader_t *header)
 {
     if (!fp || !header)
     {
-        write_log("empty params for nca get header\n");
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
-    return fread(header, 1, NCA_XTS_SECTION_SIZE, fp) == NCA_XTS_SECTION_SIZE;
+    return read_file(header, NCA_XTS_SECTION_SIZE, offset, fp) == NCA_XTS_SECTION_SIZE;
 }
 
 bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header)
 {
     if (!fp || !header)
     {
-        write_log("empty params for nca get header decrypted\n");
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
@@ -310,17 +314,17 @@ bool nca_get_header_decrypted(FILE *fp, uint64_t offset, NcaHeader_t *header)
     return nca_decrypt_header(header, header);
 }
 
-bool nca_has_rights_id(const RightsId_t *rights_id)
+bool nca_has_rights_id(const FsRightsId *rights_id)
 {
     if (!rights_id)
     {
-        write_log("empty param in nca_has_rights_id\n");
+        write_log("empty param in %s\n", __func__);
         return false;
     }
 
-    for (uint8_t i = 0; i < 0x10; i++)
+    for (uint8_t i = 0; i < sizeof(FsRightsId); i++)
     {
-        if (rights_id->rights_id[i])
+        if (rights_id->c[i])
         {
             return true;
         }
@@ -328,11 +332,27 @@ bool nca_has_rights_id(const RightsId_t *rights_id)
     return false;
 }
 
+bool nca_set_rights_id(FsRightsId *rights_id)
+{
+    if (!rights_id)
+    {
+        write_log("missing args in %s\n", __func__);
+        return false;
+    }
+
+    for (uint8_t i = 0; i < sizeof(FsRightsId); i++)
+    {
+        rights_id->c[i] = 0;
+    }
+
+    return true;
+}
+
 void nca_set_distribution_type(NcaHeader_t *header)
 {
     if (!header)
     {
-        write_log("empty param in nca_set_distribution type\n");
+        write_log("empty param in %s\n", __func__);
         return;
     }
     header->distribution_type = NcaDistributionType_System;
@@ -349,21 +369,23 @@ int nca_read(void *in)
     NcaInstall_t *t = (NcaInstall_t *)in;
     if (!t)
     {
+        write_log("missing params in %s\n", __func__);
         return -1;
     }
 
     void *buf = calloc(1, BUFFER_SIZE);
     if (!buf)
     {
+        write_log("failed to alloc buffer in %s\n", __func__);
         return -1;
     }
 
-    for (uint64_t done = t->data_written, bufsize = BUFFER_SIZE; done < t->total_size; done += bufsize)
+    for (uint64_t done = t->data_written, bufsize = BUFFER_SIZE; done < t->total_size; done += bufsize, t->offset += bufsize)
     {
         if (done + bufsize > t->total_size)
             bufsize = t->total_size - done;
 
-        read_file(buf, bufsize, done, t->fp);
+        read_file(buf, bufsize, t->offset, t->fp);
 
         mtx_lock(&nca_mtx);
         if (t->data_size != 0)
@@ -387,6 +409,7 @@ int nca_write(void *in)
     NcaInstall_t *t = (NcaInstall_t *)in;
     if (!t)
     {
+        write_log("missing params in %s\n", __func__);
         return -1;
     }
 
@@ -448,42 +471,55 @@ bool nca_setup_placeholder_id(NcmInstall_t *out, size_t size, NcmContentId *cont
     return true;
 }
 
-FILE *nca_try_open_file(NcmContentId *content_id, char *out_string, const char *mode)
+void nca_update_lower_ctr(uint8_t *ctr, uint64_t offset)
 {
-    FILE *fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".nca");
-    if (!fp)
+    if (!ctr)
     {
-        fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".cnmt.nca");
-        if (!fp)
-        {
-            fp = open_file2(mode, "%s%s", nca_get_string_from_id(content_id, out_string), ".ncz");
-            if (!fp)
-            {
-                return NULL;
-            }
-        }
+        write_log("missing params in %s\n", __func__);
+        return;
     }
-    return fp;
+    
+    uint64_t swp = __bswap64(offset);
+    memcpy(ctr, &swp, 0x8);
 }
 
-bool nca_decrypt_keak(NcaHeader_t *header, NcaKeyArea_t *out)
+void nca_update_upper_ctr(uint8_t *ctr, uint64_t offset)
 {
-    if (!header || !out)
+    if (!ctr)
     {
-        write_log("NULL args in decrypt key area func\n");
+        write_log("missing params in %s\n", __func__);
+        return;
+    }
+    
+    uint64_t swp = __bswap64(offset >> 4);
+    memcpy(ctr + 0x8, &swp, 0x8);
+}
+
+bool nca_decrypt_section(const void *in, void *out, const NcaKeyArea_t *key, uint8_t *ctr, size_t size, uint64_t offset)
+{
+    return true;
+}
+
+bool nca_read_encrypted(void *out, const NcaKeyArea_t *key, uint8_t *ctr, size_t size, uint64_t offset, FILE *fp)
+{
+    fread(out, size, 1, fp);
+    return nca_decrypt_section(out, out, key, ctr, size, offset);
+}
+
+bool __nca_decrypt_keak_keyz(const NcaHeader_t *header, NcaKeyArea_t *out, uint32_t key_gen)
+{
+    write_log("using keys to decrypt keak\n");
+
+    const uint8_t *keak = crypto_get_keak_from_keys(header->kaek_index, key_gen);
+    if (!keak)
+    {
+        write_log("no return keak %s\n", __func__);
         return false;
     }
-   
+
     // decrypt to get the key.
     NcaKeyArea_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
     Aes128Context ctx_dec = {0};
-
-    // sort out the key gen.
-    uint8_t key_gen = header->key_gen ? header->key_gen : header->old_key_gen;
-    if (key_gen) key_gen--;
-
-    const uint8_t *keak = get_keak(key_gen);
-    if (!keak) return false;
 
     aes128ContextCreate(&ctx_dec, keak, false);
     for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
@@ -491,36 +527,72 @@ bool nca_decrypt_keak(NcaHeader_t *header, NcaKeyArea_t *out)
         aes128DecryptBlock(&ctx_dec, &decrypted_nca_keys[i], &header->key_area[i]);
     }
 
-    write_log("\nencrypted keys\n");
-    for (uint8_t i = 0; i < 4; i++)
-    {
-        for (uint8_t j = 0; j < 0x10; j++)
-        {
-            write_log("%x", header->key_area[i].area[j]);
-        }
-        write_log("\n");
-    }
-
-    write_log("\ndecrypting keys\n");
-    for (uint8_t i = 0; i < 4; i++)
-    {
-        for (uint8_t j = 0; j < 0x10; j++)
-        {
-            write_log("%x", decrypted_nca_keys[i].area[j]);
-        }
-        write_log("\n");
-    }
+    nca_print_key_area(header->key_area);
+    nca_print_key_area(decrypted_nca_keys);
 
     // copy decrypted key.
     memcpy(out, &decrypted_nca_keys[0x2], sizeof(NcaKeyArea_t));
     return true;
 }
 
+bool __nca_decrypt_keak_spl(const NcaHeader_t *header, NcaKeyArea_t *out, uint32_t key_gen)
+{
+    write_log("using spl to decrypt keak\n");
+
+    NcaKeyArea_t kek = {0};
+    if (R_FAILED(splCryptoGenerateAesKek(crypto_return_keak_source(header->kaek_index), key_gen, 0, kek.area)))
+    {
+        write_log("failed to generate aea kek\n");
+        return false;
+    }
+
+    NcaKeyArea_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
+    for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
+    {
+        if (R_FAILED(splCryptoGenerateAesKey(kek.area, &header->key_area[i].area, &decrypted_nca_keys[i].area)))
+        {
+            write_log("failed to aes key %i %s\n", i, __func__);
+            return false;
+        }
+    }
+
+    nca_print_key_area(header->key_area);
+    nca_print_key_area(decrypted_nca_keys);
+
+    // copy decrypted key.
+    memcpy(out, &decrypted_nca_keys[0x2], sizeof(NcaKeyArea_t));
+    return true;
+}
+
+bool nca_decrypt_keak(const NcaHeader_t *header, NcaKeyArea_t *out)
+{
+    if (!header || !out)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    // sort out the key gen.
+    uint8_t key_gen = header->key_gen ? header->key_gen : header->old_key_gen;
+
+    // check if we can use spl.
+    if (crypto_get_sys_key_gen() >= key_gen)
+    {
+        return __nca_decrypt_keak_spl(header, out, key_gen);
+    }
+    else
+    {
+        return __nca_decrypt_keak_keyz(header, out, key_gen);
+    }
+
+    return true;
+}
+
 bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen)
 {
-    if (!header || !decrypted_key || !has_key_gen(key_gen))
+    if (!header || !decrypted_key)
     {
-        write_log("NULL args in encrypt key area func\n");
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
@@ -528,8 +600,11 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
     NcaKeyArea_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
     memcpy(&decrypted_nca_keys[0x2], decrypted_key, sizeof(NcaKeyArea_t));
 
-    const uint8_t *keak = get_keak(key_gen ? key_gen-1 : 0);
-    if (!keak) return false;
+    const uint8_t *keak = crypto_get_keak_from_keys(header->kaek_index, key_gen);
+    if (!keak)
+    {
+        return false;
+    }
 
     aes128ContextCreate(&ctx, keak, true);
     for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
@@ -537,15 +612,7 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
         aes128EncryptBlock(&ctx, &header->key_area[i], &decrypted_nca_keys[i]);
     }
 
-    write_log("\nre-encrypted keys\n");
-    for (uint8_t i = 0; i < 4; i++)
-    {
-        for (uint8_t j = 0; j < 0x10; j++)
-        {
-            write_log("%x", header->key_area[i].area[j]);
-        }
-        write_log("\n\n");
-    }
+    nca_print_key_area(header->key_area);
 
     header->key_gen = key_gen;
     header->old_key_gen = key_gen;
@@ -553,51 +620,47 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
     return true;
 }
 
-bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
+bool nca_start_install(NcmContentId *content_id, uint64_t offset, NcmStorageId storage_id, FILE *fp)
 {
-    write_log("starting to install nca to storage: %s\n", ncm_get_storage_id_string(storage_id));
-
-    // this will be the thread that is passed to the read / write.
-    NcaInstall_t nca = {0};
-
-    // first open the nca file to install.
-    char nca_string[0x30] = {0};
-    nca.fp = nca_try_open_file(content_id, nca_string, "rb");
-    if (!nca.fp)
+    if (!content_id || !fp)
     {
-        write_log("failed to open nca file... %s\n", nca_string);
+        write_log("missing params in %s\n", __func__);
         return false;
     }
 
+
+    // this will be the thread that is passed to the read / write.
+    NcaInstall_t nca = {0};
+    nca.fp = fp;
+    
     // next we need to get the header.
     NcaHeader_t *header = calloc(1, NCA_XTS_SECTION_SIZE);
     if (!header)
     {
         write_log("failed to malloc header\n");
-        fclose(nca.fp);
         return false;
     }
 
-    if (!nca_get_header_decrypted(nca.fp, 0, header))
+    if (!nca_get_header_decrypted(nca.fp, offset, header))
     {
         write_log("failed to get nca header\n");
-        fclose(nca.fp);
         free(header);
         return false;
     }
 
+    nca_print_header(header);
+
+    // lower key gen is disabled for tkey atm. Too lazy to implement. Someone pr please
     NcaKeyArea_t keak = {0};
-    if (is_lower_key_gen_enabled())
+    if (setting_get_install_lower_key_gen() && !nca_has_rights_id(&header->rights_id))
     {
         write_log("lower keygen was enabled, time to get keys!\n");
         if (!nca_decrypt_keak(header, &keak))
         {
-            fclose(nca.fp);
             return false;
         }
         if (!nca_encrypt_keak(header, &keak, 0))
         {
-            fclose(nca.fp);
             return false;
         }
     }
@@ -606,7 +669,6 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     if (!nca_setup_placeholder_id(&nca.ncm, header->size, content_id, storage_id))
     {
         write_log("failed to setup placeholder\n");
-        fclose(nca.fp);
         free(header);
         return false;
     }
@@ -616,13 +678,11 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
 
     // now update the nca struct with the actual size of the nca.
     nca.total_size = header->size;
-    write_log("Got nca size from header %lu\n", nca.total_size);
 
     // re encrypt the header.
     if (!nca_encrypt_header(header, header))
     {
         write_log("Failed to encrypt header\n");
-        fclose(nca.fp);
         free(header);
         ncm_delete_placeholder_id(&nca.ncm.storage, &nca.ncm.placeholder_id);
         ncm_close_storage(&nca.ncm.storage);
@@ -633,7 +693,6 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     if (!ncm_write_placeholder_id(&nca.ncm.storage, &nca.ncm.placeholder_id, 0, header, NCA_XTS_SECTION_SIZE))
     {
         write_log("failed to write to placeholder\n");
-        fclose(nca.fp);
         free(header);
         ncm_delete_placeholder_id(&nca.ncm.storage, &nca.ncm.placeholder_id);
         ncm_close_storage(&nca.ncm.storage);
@@ -641,6 +700,7 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     }
 
     // update the struct with the amount of data written.
+    nca.offset = offset + NCA_XTS_SECTION_SIZE;
     nca.data_written = NCA_XTS_SECTION_SIZE;
 
     // free the header as its not needed.
@@ -651,7 +711,6 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     if (!nca.data)
     {
         write_log("allocating nca buffer, size is: 0x%X\n", BUFFER_SIZE);
-        fclose(nca.fp);
         return false;
     }
 
@@ -659,7 +718,7 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     mtx_init(&nca_mtx, mtx_plain);
     cnd_init(&can_read);
     cnd_init(&can_write);
-    write_log("Init mtx and cnd\n");
+    write_log("init mtx and cnd for nca threaded install\n");
 
     thrd_t t_read = {0};
     thrd_t t_write = {0};
@@ -679,7 +738,7 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     uint8_t eta_sec = 0;
 
     // init the progress bar.
-    progress_bar_t *p_bar = ui_init_progress_bar(nca_string, speed, eta_min, eta_sec, nca.data_written, nca.total_size);
+    progress_bar_t *p_bar = ui_init_progress_bar("nca string here", speed, eta_min, eta_sec, nca.data_written, nca.total_size);
     if (!p_bar)
     {
         write_log("Failed to init progress bar!\n");
@@ -713,21 +772,12 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
     write_log("Waiting to joing threads\n");
     thrd_join(t_read, &ret_read);
     thrd_join(t_write, &ret_write);
-    write_log("Joined\n");
+    write_log("joined threads\n");
 
-    write_log("destorying mtx and cnd\n");
     mtx_destroy(&nca_mtx);
     cnd_destroy(&can_read);
     cnd_destroy(&can_write);
-    write_log("destroyed\n");
-
-    write_log("freeing nca data buffer\n");
     free(nca.data);
-    write_log("freed\n");
-
-    write_log("closing nca file\n");
-    fclose(nca.fp);
-    write_log("closed\n");
 
     // check if the threads were unsuccesful.
     if (ret_read == -1 || ret_write == -1)
@@ -761,9 +811,58 @@ bool nca_start_install(NcmContentId *content_id, NcmStorageId storage_id)
         return false;
     }
     
-    write_log("closing ncm storage\n");
     ncm_close_storage(&nca.ncm.storage);
-    write_log("closed\n");
+    write_log("finished nca install\n\n");
 
     return true;
+}
+
+
+/*
+*   Debug
+*/
+
+void nca_print_header(const NcaHeader_t *header)
+{
+    #ifdef DEBUG
+    if (!header)
+    {
+        write_log("missing params in nca_print_header\n");
+        return;
+    }
+
+    write_log("\nnca header print\n");
+    write_log("magic: %s\n", nca_get_magic_string(header->magic));
+    write_log("title_id: 0%lX\n", header->title_id);
+    write_log("context_id: %u\n", header->context_id);
+    write_log("header1sig: %u\n", header->header_1_sig_key_gen);
+    write_log("size: %lu\n", header->size);
+    write_log("sdk_version: %u\n", header->sdk_version);
+    write_log("encryption_type: %s\n", nca_has_rights_id(&header->rights_id) ? "titlekey" : "standard crypto");
+    write_log("content_type: %s\n", nca_get_content_type_string(header->content_type));
+    write_log("distribution_type: %s\n", nca_get_distribution_type_string(header->distribution_type));
+    write_log("keak_index: %s\n", nca_get_keak_index_string(header->kaek_index));
+    write_log("key_gen: %u (%s)\n\n", header->key_gen ? header->key_gen : header->old_key_gen, nca_return_key_gen_string(header->key_gen ? header->key_gen : header->old_key_gen));
+    #endif
+}
+
+void nca_print_key_area(const NcaKeyArea_t *keak)
+{
+    #ifdef DEBUG
+    if (!keak)
+    {
+        write_log("missing params in keak\n");
+        return;
+    }
+
+    write_log("\nprinting keak\n");
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        for (uint8_t j = 0; j < 0x10; j++)
+        {
+            write_log("%x", keak[i].area[j]);
+        }
+        write_log("\n");
+    }
+    #endif
 }

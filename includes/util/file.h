@@ -26,6 +26,9 @@ bool check_if_file_exists(const char *file);
 // get the size of a file.
 size_t get_file_size(const char *file);
 
+//
+void *load_file_into_mem(const char *path, size_t *out_size);
+
 // create an empty file.
 // returns 1 on success or if the file already existed.
 bool create_file(const char *file);
@@ -50,6 +53,6 @@ size_t get_file_size2(FILE *fp);
 // size: size of data tp be read.
 // offset: starting point of the data.
 // f: the file to read the data from.
-void read_file(void *out, size_t size, uint64_t offset, FILE *f);
+size_t read_file(void *out, size_t size, uint64_t offset, FILE *f);
 
 #endif

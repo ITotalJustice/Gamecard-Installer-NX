@@ -1,10 +1,8 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <dirent.h>
 
 
 typedef enum
@@ -40,6 +38,9 @@ size_t debug_dump_info(const void *buf, size_t buf_size, const char *path, const
 
 //
 void *mem_alloc(size_t size);
+
+// memory is copied then checked to see if both src and dst is equal.
+bool safe_memcpy(void *dst, const void *src, size_t size);
 
 //
 void str2hex(uint8_t *out, const char *str);

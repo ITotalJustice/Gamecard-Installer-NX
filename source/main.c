@@ -10,6 +10,7 @@
 #include "sound/sound.h"
 #include "sound/musicnx.h"
 
+#include "nx/es.h"
 #include "nx/ns.h"
 #include "nx/ncm.h"
 #include "nx/crypto.h"
@@ -26,7 +27,6 @@
 
 #define APP_DIR     "sdmc:/switch/gamecard_installer"
 #define APP_PATH    "sdmc:/switch/gamecard_installer/gamecard_installer.nro"
-#define DEBUG
 
 
 void app_init()
@@ -37,6 +37,7 @@ void app_init()
 	init_log();
 	#endif
 
+	es_start_service();
 	init_lbl();
 	init_ns();
 	ncm_init();
@@ -55,6 +56,7 @@ void app_exit()
 	exit_log();
 	#endif
 
+	es_close_service();
 	exit_menu();
 	exit_gc();
 	exit_crypto();
@@ -89,10 +91,15 @@ int main(int argc, char *argv[])
 	// setup the app dir and move the nro to the folder.
 	setup_app_dir(argv[0]);
 
+	//appletBeginBlockingHomeButtonShortAndLongPressed(0);
+
+	//appletGetAppletType();
+
 	// goto the menu.
 	start_menu();
 
 	// cleanup before exiting.
+	//appletEndBlockingHomeButtonShortAndLongPressed();
 	app_exit();
 	//appletUnlockExit();
 	return 0;

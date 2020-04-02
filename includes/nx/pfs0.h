@@ -91,6 +91,9 @@ bool pfs0_extract_all(pfs0_struct_ptr *ptr);
 void pfs0_free_structs(pfs0_struct_ptr *ptr);
 
 //
+bool pfs0_process(pfs0_struct_ptr *ptr, uint64_t offset, FILE *fp);
+
+//
 bool pfs0_start(FILE *file, uint64_t offset);
 
 #endif
