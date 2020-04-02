@@ -30,7 +30,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #     - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
 
-APP_TITLE   :=	Gamcard Installer
+APP_TITLE   :=	GameCard Installer
 APP_AUTHOR  :=	TotalJustice
 APP_VERSION :=	2.0.0
 
