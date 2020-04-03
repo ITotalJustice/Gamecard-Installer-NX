@@ -1104,49 +1104,13 @@ uint8_t handle_input(void)
 {
     input_t input = get_input();
 
-    if (input.down)
-        update_button_spin();
-
-    if (input.down & KEY_DOWN)
+    if (!input.down)
     {
-        g_cursor = move_cursor_down(g_cursor, 3);
-        play_sound(g_sound_effects.move, -1, 0);
+        return 0;   
     }
 
-    if (input.down & KEY_UP)
-    {
-        g_cursor = move_cursor_up(g_cursor, 3);
-        play_sound(g_sound_effects.move, -1, 0);
-    }
-
-    if (input.down & KEY_L)
-    {
-        gc_prev_game(&g_game_info);
-    }
-
-    if (input.down & KEY_R)
-    {
-        gc_next_game(&g_game_info);
-    }
-
-    if (input.down & KEY_B)
-    {
-        if (ui_display_yes_no_box("Would you like to exit?"))
-            return Option_Exit;  
-    }
-
-    if (input.down & KEY_X)
-    {
-        play_sound(g_sound_effects.move, -1, 0);
-        ui_display_options();
-    }
-
-    if (input.down & KEY_Y)
-    {
-        play_sound(g_sound_effects.move, -1, 0);
-        ui_display_detailed_gamecard();
-    }
-
+    update_button_spin();
+    
     int ret = check_if_option(&input);
     if (ret != -1)
     {
@@ -1154,7 +1118,47 @@ uint8_t handle_input(void)
         input.down |= KEY_A;
     }
 
-    if (input.down & KEY_A)
+    else if (input.down & KEY_DOWN)
+    {
+        g_cursor = move_cursor_down(g_cursor, 3);
+        play_sound(g_sound_effects.move, -1, 0);
+    }
+
+    else if (input.down & KEY_UP)
+    {
+        g_cursor = move_cursor_up(g_cursor, 3);
+        play_sound(g_sound_effects.move, -1, 0);
+    }
+
+    else if (input.down & KEY_L)
+    {
+        gc_prev_game(&g_game_info);
+    }
+
+    else if (input.down & KEY_R)
+    {
+        gc_next_game(&g_game_info);
+    }
+
+    else if (input.down & KEY_B)
+    {
+        if (ui_display_yes_no_box("Would you like to exit?"))
+            return Option_Exit;  
+    }
+
+    else if (input.down & KEY_X)
+    {
+        play_sound(g_sound_effects.move, -1, 0);
+        ui_display_options();
+    }
+
+    else if (input.down & KEY_Y)
+    {
+        play_sound(g_sound_effects.move, -1, 0);
+        ui_display_detailed_gamecard();
+    }
+
+    else if (input.down & KEY_A)
     {
         play_sound(g_sound_effects.popup, -1, 0);
         switch (g_cursor)
@@ -1184,6 +1188,7 @@ uint8_t handle_input(void)
                     return Option_Exit;
         }
     }
+    
     return 0;
 }
 
@@ -1199,7 +1204,9 @@ void start_menu(void)
     {
         // get input.
         if (handle_input() == Option_Exit)
+        {
             break;
+        }
 
         // update stuff.
         update_gamecard();
