@@ -83,9 +83,8 @@ void setup_app_dir(const char *nro)
 
 int main(int argc, char *argv[])
 {
-	//appletLockExit();
-
 	// init everything.
+	appletLockExit();
 	app_init();
 	
 	// setup the app dir and move the nro to the folder.
@@ -101,6 +100,6 @@ int main(int argc, char *argv[])
 	// cleanup before exiting.
 	//appletEndBlockingHomeButtonShortAndLongPressed();
 	app_exit();
-	//appletUnlockExit();
+	appletUnlockExit();
 	return 0;
 }
