@@ -1104,21 +1104,20 @@ uint8_t handle_input(void)
 {
     input_t input = get_input();
 
-    if (!input.down)
+    if (input.down)
     {
-        return 0;   
+        update_button_spin();
     }
 
-    update_button_spin();
-    
     int ret = check_if_option(&input);
     if (ret != -1)
     {
         g_cursor = ret;
+        update_options();
         input.down |= KEY_A;
     }
 
-    else if (input.down & KEY_DOWN)
+    if (input.down & KEY_DOWN)
     {
         g_cursor = move_cursor_down(g_cursor, 3);
         play_sound(g_sound_effects.move, -1, 0);
@@ -1188,7 +1187,7 @@ uint8_t handle_input(void)
                     return Option_Exit;
         }
     }
-    
+
     return 0;
 }
 
