@@ -288,6 +288,13 @@ void free_game_info_detailed(GameInfoDetailed_t *info)
         free_text(info->entry[i].size);
     }
 
+    info->id = 0;
+    info->type = 0;
+    info->keygen = 0;
+    info->version = 0;
+    info->content_count = 0;
+    info->content_meta_count = 0;
+
     memset(info, 0, sizeof(GameInfoDetailed_t));
 }
 
@@ -489,12 +496,19 @@ void ui_display_gamecard(void)
     else
     {
         // if theres more than one game on the gamecard, show the user how to swap.
-        if (g_game_info.total_count > 1)
+        if (gc_get_game_count() > 1)
         {
             draw_button(g_background.l_button);
             draw_button(g_background.r_button);
         }
-        draw_image2(g_game_info.icon);
+        if (g_game_info.icon)
+        {
+            draw_image2(g_game_info.icon);
+        }
+        else
+        {
+            draw_image2(g_empty_icon);
+        }
         draw_text(g_game_info.title);
         draw_text(g_game_info.author);
         draw_text(g_game_info.text_size);
@@ -507,11 +521,11 @@ void ui_display_gamecard(void)
 void ui_display_detailed_gamecard(void)
 {
     const SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
-    const SDL_Rect dark_box = { box.x, box.y + 72, box.w, box.h - 72 - 75 };
 
     button_t *l_button = create_button(&FONT_BUTTON[QFontSize_23], 845, box.y + 480, Colour_Nintendo_White, Font_Button_L);
     button_t *r_button = create_button(&FONT_BUTTON[QFontSize_23], 875, box.y + 480, Colour_Nintendo_White, Font_Button_R);
     text_t *swap_text = create_text(&FONT_TEXT[QFontSize_23], 910, box.y + 480, Colour_Nintendo_White, "Swap Entry");
+    text_t *title = create_text(&FONT_TEXT[QFontSize_28], box.x + 60, box.y + 30, Colour_Nintendo_White, "Game-Info");
 
     uint16_t cursor = 0;
     GameInfoDetailed_t info = {0};
@@ -544,7 +558,7 @@ void ui_display_detailed_gamecard(void)
         SDL_DrawShape(Colour_Nintendo_LightBlack, box.x + 375, box.y + 72, box.w - 375, box.h - 72 - 75, true);
 
         // title / boarder / bottom.
-        SDL_DrawText(FONT_TEXT[QFontSize_28].fnt, box.x + 60, box.y + 30, Colour_Nintendo_White, "Game-Info");
+        draw_text(title);
         SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + 75, box.w - 50, 2, true);
         SDL_DrawShape(Colour_Nintendo_White, box.x + 25, box.y + box.h - 75, box.w - 50, 2, true);
         SDL_DrawText(FONT_TEXT[QFontSize_23].fnt, box.x + 60, box.y + 480, Colour_Nintendo_White, "Page: %u / %u", cursor + 1, g_game_info.total_count);
@@ -554,7 +568,13 @@ void ui_display_detailed_gamecard(void)
         draw_text(swap_text);
 
         if (g_game_info.icon)
-        draw_image_set(g_game_info.icon, 230, 200, g_game_info.icon->rect.w / 2, g_game_info.icon->rect.h / 2);
+        {
+            draw_image_set(g_game_info.icon, 290, 200, g_game_info.icon->rect.w / 2, g_game_info.icon->rect.h / 2);
+        }
+        else
+        {
+            draw_image_set(g_empty_icon, 290, 200, g_empty_icon->rect.w / 2, g_empty_icon->rect.h / 2);
+        }
         draw_text(info.text_type);
         draw_text(info.text_id);
         draw_text(info.text_keygen);
@@ -575,6 +595,7 @@ void ui_display_detailed_gamecard(void)
     free_button(l_button);
     free_button(r_button);
     free_text(swap_text);
+    free_text(title);
 }
 
 void ui_display_button_spin(void)
@@ -1046,7 +1067,14 @@ void ui_display_progress_bar(progress_bar_t *p_bar)
 
     // game icon and speed.
     if (g_game_info.icon)
+    {
         draw_image_set(g_game_info.icon, 320, 200, g_game_info.icon->rect.w / 2, g_game_info.icon->rect.h / 2);
+    }
+    else
+    {
+        draw_image_set(g_empty_icon, 320, 200, g_empty_icon->rect.w / 2, g_empty_icon->rect.h / 2);
+    }
+
     draw_text(p_bar->text_speed);
     draw_text(p_bar->text_name);
     draw_text(p_bar->text_time);

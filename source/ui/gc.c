@@ -553,20 +553,27 @@ bool gc_unmount(void)
     {
         for (uint16_t i = 0; i < GAMECARD.file_table.game_count; i++)
         {
-            if (GAMECARD.entries[i].base_count && GAMECARD.entries[i].base)
+            if (&GAMECARD.entries[i])
             {
-                free(GAMECARD.entries[i].base);
-            }
-            if (GAMECARD.entries[i].upp_count && GAMECARD.entries[i].upp)
-            {
-                free(GAMECARD.entries[i].upp);
-            }
-            if (GAMECARD.entries[i].dlc_count && GAMECARD.entries[i].dlc)
-            {
-                free(GAMECARD.entries[i].dlc);
+                if (GAMECARD.entries[i].base_count && GAMECARD.entries[i].base)
+                {
+                    free(GAMECARD.entries[i].base);
+                    GAMECARD.entries[i].base = NULL;
+                }
+                if (GAMECARD.entries[i].upp_count && GAMECARD.entries[i].upp)
+                {
+                    free(GAMECARD.entries[i].upp);
+                    GAMECARD.entries[i].upp = NULL;
+                }
+                if (GAMECARD.entries[i].dlc_count && GAMECARD.entries[i].dlc)
+                {
+                    free(GAMECARD.entries[i].dlc);
+                    GAMECARD.entries[i].dlc = NULL;
+                }
             }
         }
         free(GAMECARD.entries);
+        GAMECARD.entries = NULL;
     }
     if (GAMECARD.string_table)
     {
@@ -633,6 +640,8 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
         return false;
     }
 
+    memset(out_info, 0, sizeof(GameInfo_t));
+    
     out_info->app_id = ncm_get_app_id_from_title_id(GAMECARD.entries[game_pos].base[0].cnmt.key.id, GAMECARD.entries[game_pos].base[0].cnmt.key.type);
     out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
     enable_text_clip(out_info->text_app_id, 0, 325);
