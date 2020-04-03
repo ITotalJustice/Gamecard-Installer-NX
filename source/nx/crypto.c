@@ -279,7 +279,7 @@ const uint8_t *crypto_return_keak_source(NcaKeyAreaEncryptionKeyIndex index)
     }
 }
 
-void *crypto_aes(const void *in, void *out, uint8_t *key, EncryptMode mode)
+void *crypto_aes(const void *in, void *out, const uint8_t *key, EncryptMode mode)
 {
     Aes128Context ctx = {0};
     aes128ContextCreate(&ctx, key, mode);
@@ -288,12 +288,12 @@ void *crypto_aes(const void *in, void *out, uint8_t *key, EncryptMode mode)
     {
         case EncryptMode_Decrypt:
         {
-            aes128EncryptBlock(&ctx, out, in);
+            aes128DecryptBlock(&ctx, out, in);
             break;
         }
         case EncryptMode_Encrypt:
         {
-            aes128DecryptBlock(&ctx, out, in);
+            aes128EncryptBlock(&ctx, out, in);
             break;
         }
     }
@@ -301,7 +301,7 @@ void *crypto_aes(const void *in, void *out, uint8_t *key, EncryptMode mode)
     return out;
 }
 
-void *crypto_aes_ctr(const void *in, void *out, uint8_t *key, uint8_t *counter, size_t size, uint64_t offset)
+void *crypto_aes_ctr(const void *in, void *out, const uint8_t *key, uint8_t *counter, size_t size, uint64_t offset)
 {
     Aes128CtrContext ctx = {0};
     aes128CtrContextCreate(&ctx, key, counter);
@@ -337,7 +337,7 @@ void *crypto_aes_cbc(const void *in, void *out, const uint8_t *key, size_t size,
     return out;
 }
 
-void *crypto_aes_xts(const void *in, void *out, uint8_t *key0, uint8_t *key1, uint64_t sector, size_t sector_size, size_t data_size, EncryptMode mode)
+void *crypto_aes_xts(const void *in, void *out, const uint8_t *key0, const uint8_t *key1, uint64_t sector, size_t sector_size, size_t data_size, EncryptMode mode)
 {
     Aes128XtsContext ctx = {0};
     aes128XtsContextCreate(&ctx, key0, key1, mode);

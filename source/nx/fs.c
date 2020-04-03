@@ -1010,7 +1010,6 @@ bool fs_mount_gamecard_partition(char *out, const FsGameCardHandle *handle, FsGa
         return false;
     }
 
-    write_log("returning true\n");
     return true;
 }
 

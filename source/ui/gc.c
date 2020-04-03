@@ -771,6 +771,36 @@ bool gc_change_game(GameInfo_t *info_out, uint16_t game_pos)
 *   GameCard Install.
 */
 
+bool __gc_do_ticket_magic(const char *ticket_path, uint64_t id)  //nice function name bro.
+{
+    if (!ticket_path)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    uint64_t gen = strtoul(ticket_path + 0x10, NULL, 0x10);
+    FILE *fp = fopen(ticket_path, "rb");
+    if (!fp)
+    {
+        write_log("failed to open file %s\n", __func__);
+        return false;
+    }
+
+    uint8_t key[0x10] = {0};
+    // double fseek because a single fseek doesn't work.
+    // i've been told that i have to align reads, but i like the fact that double fseek fixes a bug ;)
+    fseek(fp, 0x180, SEEK_SET);
+    fseek(fp, 0x180, SEEK_SET);
+    fread(key, 0x10, 1, fp);
+    fclose(fp);
+
+    crypto_aes(key, key, crypto_get_titlekek_from_keys(gen), EncryptMode_Decrypt);
+    nca_set_keyslot(id, key);
+
+    return true;
+}
+
 void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *entry)
 {
     /*
@@ -779,6 +809,12 @@ void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *ent
 
     // check if we have any tickets.
     if (!gamecard->file_table.tik_count || !gamecard->file_table.cert_count)
+    {
+        return;
+    }
+
+    // check if we already have the key.
+    if (setting_get_install_lower_key_gen() && entry->cnmt.key.id == nca_get_keyslot_id())
     {
         return;
     }
@@ -801,6 +837,11 @@ void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *ent
         if (strcmp(ext, ".tik") == 0 && strstr(gamecard->string_table[i].name, str_id))
         {
             write_log("found ticket\n");
+            if (setting_get_install_lower_key_gen())
+            {
+                __gc_do_ticket_magic(gamecard->string_table[i].name, entry->cnmt.key.id);
+                return;
+            }
             tik_pos = i;
             found_tik = true;
         }
@@ -814,7 +855,7 @@ void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *ent
 
     if (found_tik && found_cert)
     {
-        write_log("INSTALLING TICKET\n");
+        write_log("installing ticket %s %s\n", gamecard->string_table[tik_pos].name, gamecard->string_table[cert_pos].name);
 
         size_t tik_size = 0;
         size_t cert_size = 0;
@@ -851,6 +892,7 @@ bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
     {
         return false;
     }
+    
     if (!cnmt_push_record(&entry->cnmt.key, storage_id))
     {
         return false;
@@ -860,7 +902,6 @@ bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
     // ie, installing v2 over v1. v1 will still exist in ncm, this will delete it.
     // can be done manually, and will be done so soon.
     // this will also fix mistakes from bad installers that do not clean up left over ncas.
-    // *wink wink*.
     nsDeleteRedundantApplicationEntity();
 
     for (uint16_t i = 0; i < entry->cnmt.header.content_count; i++)
@@ -928,12 +969,11 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
             continue;
         }
 
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].base[i]);
         if (!__gc_install(&GAMECARD.entries[game_pos].base[i], base_location))
         {
             return false;
         }
-
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].base[i]);
     }
 
     // upp.
@@ -944,12 +984,11 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
             continue;
         }
 
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].upp[i]);
         if (!__gc_install(&GAMECARD.entries[game_pos].upp[i], upp_location))
         {
             return false;
         }
-
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].upp[i]);
     }
 
     // dlc.
@@ -960,12 +999,11 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
             continue;
         }
 
+        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].dlc[i]);
         if (!__gc_install(&GAMECARD.entries[game_pos].dlc[i], dlc_location))
         {
             return false;
         }
-
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].dlc[i]);
     }
 
     return true;

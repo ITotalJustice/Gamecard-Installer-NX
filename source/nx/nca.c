@@ -37,11 +37,7 @@ typedef struct
     NcmInstall_t ncm;
 } NcaInstall_t;
 
-typedef struct
-{
-    uint64_t id;        // belonging ID.
-    NcaKeyArea_t key;   // the actual key.
-} NcaKeySlot_t;
+
 NcaKeySlot_t KEYSLOT = {0};
 
 bool nca_set_keyslot(uint64_t id, const uint8_t *key)
@@ -381,7 +377,7 @@ bool nca_set_rights_id(FsRightsId *rights_id)
 
     for (uint8_t i = 0; i < sizeof(FsRightsId); i++)
     {
-        rights_id->c[i] = 0;
+        rights_id->c[i] = 0x0;
     }
 
     return true;
@@ -637,7 +633,8 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
 
     Aes128Context ctx = {0};
     NcaKeyArea_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
-    memcpy(&decrypted_nca_keys[0x2], decrypted_key, sizeof(NcaKeyArea_t));
+
+    memcpy(&decrypted_nca_keys[0x2].area, decrypted_key->area, sizeof(NcaKeyArea_t));
 
     const uint8_t *keak = crypto_get_keak_from_keys(header->kaek_index, key_gen);
     if (!keak)
@@ -648,13 +645,23 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
     aes128ContextCreate(&ctx, keak, true);
     for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
     {
-        aes128EncryptBlock(&ctx, &header->key_area[i], &decrypted_nca_keys[i]);
+        aes128EncryptBlock(&ctx, &header->key_area[i].area, &decrypted_nca_keys[i].area);
     }
 
-    nca_print_key_area(header->key_area);
+    // set the rights_id field.
+    memset(&header->rights_id, 0, sizeof(FsRightsId));
 
-    header->key_gen = key_gen;
-    header->old_key_gen = key_gen;
+    // update with new keygen version.
+    if (key_gen > NcaOldKeyGeneration_300)
+    {
+        header->key_gen = key_gen;
+        header->old_key_gen = NcaOldKeyGeneration_300;
+    }
+    else
+    {
+        header->key_gen = 0;
+        header->old_key_gen = key_gen;
+    }
 
     return true;
 }
@@ -666,7 +673,6 @@ bool nca_start_install(const char *name, const NcmContentId *content_id, uint64_
         write_log("missing params in %s\n", __func__);
         return false;
     }
-
 
     // this will be the thread that is passed to the read / write.
     NcaInstall_t nca = {0};
@@ -689,21 +695,32 @@ bool nca_start_install(const char *name, const NcmContentId *content_id, uint64_
 
     nca_print_header(header);
 
-    // lower key gen is disabled for tkey atm. Too lazy to implement. Someone pr please
-    NcaKeyArea_t keak = {0};
-    if (setting_get_install_lower_key_gen() && !nca_has_rights_id(&header->rights_id))
+    if (setting_get_install_lower_key_gen())
     {
-        write_log("lower keygen was enabled, time to get keys!\n");
-        if (!nca_decrypt_keak(header, &keak))
+        if (nca_has_rights_id(&header->rights_id))
         {
-            return false;
+            if (!nca_encrypt_keak(header, nca_get_keyslot_key(), 0))
+            {
+                free(header);
+                return false;
+            }
         }
-        if (!nca_encrypt_keak(header, &keak, 0))
+        else
         {
-            return false;
+            NcaKeyArea_t keak = {0};
+            if (!nca_decrypt_keak(header, &keak))
+            {
+                free(header);
+                return false;
+            }
+            if (!nca_encrypt_keak(header, &keak, header->key_gen))
+            {
+                free(header);
+                return false;
+            }
         }
     }
-    
+
     // now that we have the actual size of the nca, we can setup the placeholder.
     if (!nca_setup_placeholder_id(&nca.ncm, header->size, content_id, storage_id))
     {

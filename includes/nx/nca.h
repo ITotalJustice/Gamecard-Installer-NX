@@ -166,6 +166,12 @@ typedef struct
 
 typedef struct
 {
+    uint64_t id;        // belonging ID.
+    NcaKeyArea_t key;   // the actual key.
+} NcaKeySlot_t;
+
+typedef struct
+{
     uint8_t rsa_fixed_key[0x100];
     uint8_t rsa_npdm[0x100];        // key from npdm.
     uint32_t magic;
@@ -179,7 +185,7 @@ typedef struct
     uint32_t sdk_version;
     uint8_t key_gen;                // see NcaKeyGeneration.
     uint8_t header_1_sig_key_gen;
-    uint8_t _0x221[0xE];            // empty.
+    uint8_t _0x222[0xE];            // empty.
     FsRightsId rights_id;
 
     NcaSectionTableEntry_t section_table[NCA_SECTION_TOTAL];
@@ -207,15 +213,17 @@ const char *nca_return_key_gen_string(uint8_t key_gen);
 
 //
 uint16_t nca_return_key_gen_int(uint8_t key_gen);
-
-//
 bool nca_check_key_gen(uint8_t key_gen);
 
 //
 const char *nca_get_string_from_id(const NcmContentId *nca_id, char *out);
-
-//
 const NcmContentId nca_get_id_from_string(const char *nca_in_string);
+
+
+bool nca_set_keyslot(uint64_t id, const uint8_t *key);
+NcaKeySlot_t *nca_get_keyslot(void);
+NcaKeyArea_t *nca_get_keyslot_key(void);
+uint64_t nca_get_keyslot_id(void);
 
 
 /*

@@ -35,9 +35,9 @@ const uint8_t *crypto_get_titlekek_from_keys(uint8_t key_gen);
 //
 const uint8_t *crypto_return_keak_source(NcaKeyAreaEncryptionKeyIndex index);
 
-void *crypto_aes(const void *in, void *out, uint8_t *key, EncryptMode mode);
-void *crypto_aes_ctr(const void *in, void *out, uint8_t *key, uint8_t *counter, size_t size, uint64_t offset);
+void *crypto_aes(const void *in, void *out, const uint8_t *key, EncryptMode mode);
+void *crypto_aes_ctr(const void *in, void *out, const uint8_t *key, uint8_t *counter, size_t size, uint64_t offset);
 void *crypto_aes_cbc(const void *in, void *out, const uint8_t *key, size_t size, void *iv, EncryptMode mode);
-void *crypto_aes_xts(const void *in, void *out, uint8_t *key0, uint8_t *key1, uint64_t sector, size_t sector_size, size_t data_size, EncryptMode mode);
+void *crypto_aes_xts(const void *in, void *out, const uint8_t *key0, const uint8_t *key1, uint64_t sector, size_t sector_size, size_t data_size, EncryptMode mode);
 
 #endif
