@@ -149,6 +149,10 @@ void setup_background(void)
     g_background.b_button = create_button(&FONT_BUTTON[QFontSize_25], 1055 - 35, 675, Colour_Nintendo_White, Font_Button_B);
     g_background.x_button = create_button(&FONT_BUTTON[QFontSize_25], 870, 675, Colour_Nintendo_White, Font_Button_X);
     g_background.y_button = create_button(&FONT_BUTTON[QFontSize_25], 700, 675, Colour_Nintendo_White, Font_Button_Y);
+    g_background.l_button = create_button(&FONT_BUTTON[QFontSize_25], 90 - 40, 130 + (255/2), Colour_Nintendo_White, Font_Button_L);
+    g_background.r_button = create_button(&FONT_BUTTON[QFontSize_25], 90 + 255 + 15, 130 + (255/2), Colour_Nintendo_White, Font_Button_R);
+
+    // button text.        
     g_background.a_text = create_text(&FONT_TEXT[QFontSize_20], 1185, 675, Colour_Nintendo_White, "OK");
     g_background.b_text = create_text(&FONT_TEXT[QFontSize_20], 1055, 675, Colour_Nintendo_White, "Back");
     g_background.x_text = create_text(&FONT_TEXT[QFontSize_20], 905, 675, Colour_Nintendo_White, "Settings");
@@ -206,6 +210,8 @@ void free_background(void)
     free_button(g_background.b_button);
     free_button(g_background.x_button);
     free_button(g_background.y_button);
+    free_button(g_background.l_button);
+    free_button(g_background.r_button);
     free_text(g_background.a_text);
     free_text(g_background.b_text);
     free_text(g_background.x_text);
@@ -482,6 +488,12 @@ void ui_display_gamecard(void)
     }
     else
     {
+        // if theres more than one game on the gamecard, show the user how to swap.
+        if (g_game_info.total_count > 1)
+        {
+            draw_button(g_background.l_button);
+            draw_button(g_background.r_button);
+        }
         draw_image2(g_game_info.icon);
         draw_text(g_game_info.title);
         draw_text(g_game_info.author);
