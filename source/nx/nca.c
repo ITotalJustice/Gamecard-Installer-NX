@@ -713,7 +713,7 @@ bool nca_start_install(const char *name, const NcmContentId *content_id, uint64_
                 free(header);
                 return false;
             }
-            if (!nca_encrypt_keak(header, &keak, header->key_gen))
+            if (!nca_encrypt_keak(header, &keak, 0))
             {
                 free(header);
                 return false;

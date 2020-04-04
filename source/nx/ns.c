@@ -132,6 +132,20 @@ int32_t ns_count_application_record(uint64_t app_id)
     return count;
 }
 
+bool ns_is_any_application_redundent(void)
+{
+    Result rc = 0;
+    bool ret = false;
+
+    if (R_FAILED(rc))
+    {
+        write_log("failed %s %s\n", __func__, R_DESCRIPTION(rc));
+        return false;
+    }
+
+    return ret;
+}
+
 Result ns_delete_application_entity(uint64_t app_id)
 {
     Result rc = nsDeleteApplicationEntity(app_id);

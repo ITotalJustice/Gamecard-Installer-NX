@@ -16,12 +16,12 @@
 typedef struct
 {
     uint16_t file_count;
-    uint16_t cnmt_count;
-    uint16_t nca_count;
-    uint16_t tik_count;
-    uint16_t cert_count;
-    uint16_t game_count;
-    uint64_t total_size;
+    uint16_t cnmt_count;    
+    uint16_t nca_count;     // num of ncas found.
+    uint16_t tik_count;     // num tickets on gamecard.
+    uint16_t cert_count;    // num cert on gamecard.
+    uint16_t game_count;    // num of games found. this is the total cnmt found with a unique ID.
+    uint64_t total_size;    // total size of all files on the gamecard.
 } GameCardFileTable_t;
 
 // maybe change this so that each entry gets a file entry
@@ -33,22 +33,26 @@ typedef struct
 
 typedef struct
 {
-    uint8_t key_gen;
-    uint64_t size;
-    Cnmt_t cnmt;
+    uint8_t key_gen;        // keygen of this entry (only cnmt is checked).
+    uint64_t size;          // size of all ncas in this entry.
+    Cnmt_t cnmt;            // ncm data, such as cnmt header, cnmt extended header, ncm key, content infos.
 } GameCardEntry_t;
 
 typedef struct
 {
-    uint64_t total_size;
+    uint64_t total_size;    // total install size.
+    uint64_t base_size;     // total base size.
+    uint64_t upp_size;      // total upp size.
+    uint64_t dlc_size;      // total dlc size.
+
     uint32_t total_count;
     uint16_t base_count;    // should always be 1.
-    uint16_t upp_count;     // i'm not sure if games can come with multiple updates for the same game, wouldn't make sense. This is here for compatibilty should that happen.
+    uint16_t upp_count;     // i'm not sure if games can come with multiple updates for the same game, wouldn't make sense. This is here for compatibilty should that happen (cxi).
     uint16_t dlc_count;     // games can come bundled with multiple dlc.
 
-    GameCardEntry_t *base;
-    GameCardEntry_t *upp;
-    GameCardEntry_t *dlc;
+    GameCardEntry_t *base;  // array for base entry.
+    GameCardEntry_t *upp;   // array for upp entry.
+    GameCardEntry_t *dlc;   // array for dlc entry.
 } GameCardGameEntries_t;
 
 typedef struct

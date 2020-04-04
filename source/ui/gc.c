@@ -203,6 +203,7 @@ bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_
         case NcmContentMetaType_Application:
             memcpy(&GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt, cnmt, sizeof(Cnmt_t));
             GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.content_infos, GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].base_size += GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].size;
             GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].size;
             GAMECARD.entries[pos].base[GAMECARD.entries[pos].base_count].key_gen = key_gen;
             GAMECARD.entries[pos].base_count++;
@@ -210,6 +211,7 @@ bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_
         case NcmContentMetaType_Patch:
             memcpy(&GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt, cnmt, sizeof(Cnmt_t));
             GAMECARD.entries[pos].upp[GAMECARD.entries[pos].base_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.content_infos, GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].upp_size += GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].size;
             GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].size;
             GAMECARD.entries[pos].upp[GAMECARD.entries[pos].upp_count].key_gen = key_gen;
             GAMECARD.entries[pos].upp_count++;
@@ -217,6 +219,7 @@ bool __gc_setup_entry(GameCardGameEntries_t *entries, const Cnmt_t *cnmt, uint8_
         case NcmContentMetaType_AddOnContent:
             memcpy(&GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt, cnmt, sizeof(Cnmt_t));
             GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].size = ncm_calculate_content_infos_size(GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.content_infos, GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].cnmt.header.content_count);
+            GAMECARD.entries[pos].dlc_size += GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].size;
             GAMECARD.entries[pos].total_size += GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].size;
             GAMECARD.entries[pos].dlc[GAMECARD.entries[pos].dlc_count].key_gen = key_gen;
             GAMECARD.entries[pos].dlc_count++;
@@ -641,7 +644,7 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
     }
 
     memset(out_info, 0, sizeof(GameInfo_t));
-    
+
     out_info->app_id = ncm_get_app_id_from_title_id(GAMECARD.entries[game_pos].base[0].cnmt.key.id, GAMECARD.entries[game_pos].base[0].cnmt.key.type);
     out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
     enable_text_clip(out_info->text_app_id, 0, 325);
@@ -955,14 +958,67 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
     SettingsInstallLocation dlc_location = setting_get_install_dlc_location();
     if (dlc_location == SettingsInstallLocation_Default) dlc_location = storage_id;
 
-    // TODO: calculate install size.
-    // user might only want to install dlc.
-    // loop through dlc and add the size.
-    if (ns_get_storage_free_space(storage_id) <= GAMECARD.entries[game_pos].total_size)
+    SettingFlag base_flag = setting_get_install_base();
+    SettingFlag upp_flag = setting_get_install_upp();
+    SettingFlag dlc_flag = setting_get_install_dlc();
+
+    // we will allow for split installs soon. so we need to check both storage sizes.
+    size_t total_install_size_nand = 0;
+    size_t total_install_size_sd = 0;
+
+    // calculate the size of install for each storage.
+    if (base_flag && GAMECARD.entries[game_pos].base_count)
     {
-        write_log("not enough free space.\n");
-        ui_display_error_box(ErrorCode_NoSpace, __func__);
-        return false;
+        if (base_location == SettingsInstallLocation_User)
+        {
+            total_install_size_nand += GAMECARD.entries[game_pos].base_size;
+        }
+        else
+        {
+            total_install_size_sd += GAMECARD.entries[game_pos].base_size;
+        }
+    }
+    if (upp_flag && GAMECARD.entries[game_pos].upp_count)
+    {
+        if (base_location == SettingsInstallLocation_User)
+        {
+            total_install_size_nand += GAMECARD.entries[game_pos].upp_size;
+        }
+        else
+        {
+            total_install_size_sd += GAMECARD.entries[game_pos].upp_size;
+        }
+    }
+    if (dlc_flag && GAMECARD.entries[game_pos].dlc_count)
+    {
+        if (base_location == SettingsInstallLocation_User)
+        {
+            total_install_size_nand += GAMECARD.entries[game_pos].dlc_size;
+        }
+        else
+        {
+            total_install_size_sd += GAMECARD.entries[game_pos].dlc_size;
+        }
+    }
+
+    if (total_install_size_nand)
+    {
+        if (ns_get_storage_free_space(storage_id) <= total_install_size_nand)
+        {
+            write_log("not enough free nand space.\n");
+            ui_display_error_box(ErrorCode_NoSpace, __func__);
+            return false;
+        }
+    }
+
+    if (total_install_size_sd)
+    {
+        if (ns_get_storage_free_space(storage_id) <= total_install_size_sd)
+        {
+            write_log("not enough free sd space.\n");
+            ui_display_error_box(ErrorCode_NoSpace, __func__);
+            return false;
+        }
     }
 
     /*
@@ -971,47 +1027,56 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
     */
 
     // base.
-    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].base_count && setting_get_install_base() == SettingFlag_On; i++)
+    if (base_flag == SettingFlag_On)
     {
-        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].base[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+        for (uint16_t i = 0; i < GAMECARD.entries[game_pos].base_count; i++)
         {
-            continue;
-        }
+            if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].base[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+            {
+                continue;
+            }
 
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].base[i]);
-        if (!__gc_install(&GAMECARD.entries[game_pos].base[i], base_location))
-        {
-            return false;
+            __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].base[i]);
+            if (!__gc_install(&GAMECARD.entries[game_pos].base[i], base_location))
+            {
+                return false;
+            }
         }
     }
 
     // upp.
-    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].upp_count && setting_get_install_upp() == SettingFlag_On; i++)
+    if (upp_flag == SettingFlag_On)
     {
-        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].upp[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+        for (uint16_t i = 0; i < GAMECARD.entries[game_pos].upp_count; i++)
         {
-            continue;
-        }
+            if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].upp[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+            {
+                continue;
+            }
 
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].upp[i]);
-        if (!__gc_install(&GAMECARD.entries[game_pos].upp[i], upp_location))
-        {
-            return false;
+            __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].upp[i]);
+            if (!__gc_install(&GAMECARD.entries[game_pos].upp[i], upp_location))
+            {
+                return false;
+            }
         }
     }
 
     // dlc.
-    for (uint16_t i = 0; i < GAMECARD.entries[game_pos].dlc_count && setting_get_install_dlc() == SettingFlag_On; i++)
+    if (dlc_flag == SettingFlag_On)
     {
-        if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].dlc[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+        for (uint16_t i = 0; i < GAMECARD.entries[game_pos].dlc_count; i++)
         {
-            continue;
-        }
+            if (!ncm_is_key_newer(&GAMECARD.entries[game_pos].dlc[i].cnmt.key) && setting_get_overwrite_newer_version() == SettingFlag_Off)
+            {
+                continue;
+            }
 
-        __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].dlc[i]);
-        if (!__gc_install(&GAMECARD.entries[game_pos].dlc[i], dlc_location))
-        {
-            return false;
+            __gc_matching_ticket(&GAMECARD, &GAMECARD.entries[game_pos].dlc[i]);
+            if (!__gc_install(&GAMECARD.entries[game_pos].dlc[i], dlc_location))
+            {
+                return false;
+            }
         }
     }
 
