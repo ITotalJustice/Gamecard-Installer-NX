@@ -643,34 +643,49 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
         return false;
     }
 
+    // reset the info.
     memset(out_info, 0, sizeof(GameInfo_t));
 
-    out_info->app_id = ncm_get_app_id_from_title_id(GAMECARD.entries[game_pos].base[0].cnmt.key.id, GAMECARD.entries[game_pos].base[0].cnmt.key.type);
-    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
-    enable_text_clip(out_info->text_app_id, 0, 325);
-    out_info->key_gen = GAMECARD.entries[game_pos].base[0].key_gen;
-    out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 535, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
-    enable_text_clip(out_info->text_key_gen, 0, 325);
-    out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 575, Colour_Nintendo_White, "Size: %.2fGB", (float)GAMECARD.entries[game_pos].total_size / 0x40000000);
-    enable_text_clip(out_info->text_size, 0, 325);
-    out_info->text_entry_contents = create_text(&FONT_TEXT[QFontSize_18], 50, 615, Colour_Nintendo_White, "Base: %u Upp: %u DLC: %u", GAMECARD.entries[game_pos].base_count, GAMECARD.entries[game_pos].upp_count, GAMECARD.entries[game_pos].dlc_count);
-    enable_text_clip(out_info->text_entry_contents, 0, 325);
+    // calculate the size in GiB. If size is less than 10MiB, show size in MiB.
+    char size_type_text[] = "GiB";
+    float game_size = (float)GAMECARD.entries[game_pos].total_size / 0x40000000;
+    if (game_size < 0.01)
+    {
+        game_size = (float)GAMECARD.entries[game_pos].total_size / 0x100000;
+        strcpy(size_type_text, "MiB");
+    }
 
+    // store the values.
+    out_info->app_id = GAMECARD.entries[game_pos].base[0].cnmt.key.id;
+    out_info->key_gen = GAMECARD.entries[game_pos].base[0].key_gen;
     out_info->base_count = GAMECARD.entries[game_pos].base_count;
     out_info->upp_count = GAMECARD.entries[game_pos].upp_count;
     out_info->dlc_count = GAMECARD.entries[game_pos].dlc_count;
     out_info->total_count = GAMECARD.entries[game_pos].total_count;
 
+    // create the textures.
+    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
+    out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 535, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
+    out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 575, Colour_Nintendo_White, "Size: %.2f %s", game_size, size_type_text);
+    out_info->text_entry_contents = create_text(&FONT_TEXT[QFontSize_18], 50, 615, Colour_Nintendo_White, "Base: %u Upp: %u DLC: %u", GAMECARD.entries[game_pos].base_count, GAMECARD.entries[game_pos].upp_count, GAMECARD.entries[game_pos].dlc_count);
+    enable_text_clip(out_info->text_app_id, 0, 325);
+    enable_text_clip(out_info->text_key_gen, 0, 325);
+    enable_text_clip(out_info->text_size, 0, 325);
+    enable_text_clip(out_info->text_entry_contents, 0, 325);
+
     // TODO: manually parse the control.nacp if this fails.
     NsApplicationControlData control_data = {0};
-    if (ns_get_app_control_data(&control_data, out_info->app_id))
+    size_t control_data_size = ns_get_app_control_data(&control_data, out_info->app_id);
+    if (control_data_size)
     {
-        out_info->icon = create_image_from_mem(&control_data.icon, 0x20000, 90, 130, 0, 0);
+        size_t icon_size = control_data_size - sizeof(NacpStruct);
+        out_info->icon = create_image_from_mem(&control_data.icon, icon_size, 90, 130, 0, 0);
         out_info->title = create_text(&FONT_TEXT[QFontSize_18], 50, 415, Colour_Nintendo_White, control_data.nacp.lang[0].name);
-        enable_text_clip(out_info->title, 0, 325);
         out_info->author = create_text(&FONT_TEXT[QFontSize_18], 50, 455, Colour_Nintendo_White, control_data.nacp.lang[0].author);
+        enable_text_clip(out_info->title, 0, 325);
         enable_text_clip(out_info->author, 0, 325);
     }
+
     return true;
 }
 
@@ -705,6 +720,7 @@ bool gc_setup_detailed_game_info(GameInfoDetailed_t *info_out, uint16_t entry)
     info_out->content_count = tmp_entry->cnmt.header.content_count;
     info_out->content_meta_count = tmp_entry->cnmt.header.content_meta_count;
 
+    // create the textures.
     info_out->text_type = create_text(&FONT_TEXT[QFontSize_18], 230, 360, Colour_Nintendo_White, "Type: %s", ncm_get_meta_type_string(info_out->type));
     info_out->text_id = create_text(&FONT_TEXT[QFontSize_18], 230, 390, Colour_Nintendo_White, "ID: %lX", info_out->id);
     info_out->text_keygen = create_text(&FONT_TEXT[QFontSize_18], 230, 420, Colour_Nintendo_White, "Key-Gen: %u", info_out->keygen);
@@ -713,6 +729,12 @@ bool gc_setup_detailed_game_info(GameInfoDetailed_t *info_out, uint16_t entry)
     info_out->text_content_meta_count = create_text(&FONT_TEXT[QFontSize_18], 230, 510, Colour_Nintendo_White, "Content Meta Count: %u", info_out->content_meta_count);
 
     info_out->entry = calloc(info_out->content_count, sizeof(GameInfoEntry_t));
+    if (!info_out->entry)
+    {
+        ui_display_error_box(ErrorCode_Alloc, __func__);
+        write_log("failed to alloc entry %s\n", __func__);
+        return false;
+    }
 
     // setup the textures.
     for (uint16_t i = 0, y = 195; i < info_out->content_count; i++, y += 47)
@@ -807,7 +829,12 @@ bool __gc_do_ticket_magic(const char *ticket_path, uint64_t id)  //nice function
     fread(key, 0x10, 1, fp);
     fclose(fp);
 
+    // decrypt the key.
     crypto_aes(key, key, crypto_get_titlekek_from_keys(gen), EncryptMode_Decrypt);
+
+    // set the key in keyslot.
+    // eventually i will re-write this so that i just pass a struct into nca_install.
+    // this will have the ticket info in that struct.
     nca_set_keyslot(id, key);
 
     return true;
@@ -815,10 +842,6 @@ bool __gc_do_ticket_magic(const char *ticket_path, uint64_t id)  //nice function
 
 void __gc_matching_ticket(const GameCard_t *gamecard, const GameCardEntry_t *entry)
 {
-    /*
-    *   I've stopped caring about code quality now.
-    */
-
     // check if we have any tickets.
     if (!gamecard->file_table.tik_count || !gamecard->file_table.cert_count)
     {
