@@ -21,6 +21,17 @@ Some gamecards have multiple games inside. An example of this is the Child of Li
 
 These can still be installed. Pressing `L` or `R` will allow you to cycle through the games on the gamecard.
 
+__Lower Keygen Version__
+
+Lowering the keygen (to zero) can allow for games to be launched on all firmware version. This does not guarantee that the game will work however.
+
+This option will also convert any titlekey encrypted nca's to standard crypto (ticketless).
+
+An example of a working game is Pokemon Sword, this game requires firmware 7 usually, however it can work on firmware 6.
+
+To use this option, you must have a keys file named either `prod.keys` or `keys.txt` in either `/switch` or `/switch/gamecard_installer/`.
+
+To dump your own keys please use [Lockpick RCM](https://github.com/shchmue/Lockpick_RCM).
 
 __Playing music__
 
@@ -30,7 +41,7 @@ Simply drop any .mp3 files into `/switch/gamecard_installer/`.
 
 You can have the .mp3 in folders if you prefer, the app will scan recursively. E.g. `/switch/gamecard_installer/music/song.mp3`.
 
-[Here's a great site for high quality video game music.](https://downloads.khinsider.com/)
+[Here's a great site for high quality video game music.](https://downloads.khinsider.com/).
 
 ----
 
