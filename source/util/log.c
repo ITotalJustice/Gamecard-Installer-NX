@@ -8,7 +8,6 @@
 #include "util/log.h"
 
 
-#define DEBUG
 #define LOG_OUTPUT   "sdmc:/switch/gamecard_installer/log.txt"
 
 
@@ -17,7 +16,8 @@ mtx_t g_log_mtx = {0};
 
 
 bool init_log(void)
-{   
+{
+    #ifdef DEBUG
     FILE *fp = fopen(LOG_OUTPUT, "w");
     if (!fp)
         return false;
@@ -32,10 +32,12 @@ bool init_log(void)
 	printf("otherwise you won't see debug messages :(\n\n");
 
     return g_log_flag = true;
+    #endif
 }
 
 void write_log(const char *text, ...)
 {
+    #ifdef DEBUG
     if (!g_log_flag)
         return;
 
@@ -47,23 +49,26 @@ void write_log(const char *text, ...)
 
     va_list v;
     va_start(v, text);
-    vfprintf(fp, text, v);
-    vfprintf(stdout, text, v);
+    //vfprintf(fp, text, v);
+    vprintf(text, v);
     va_end(v);
 
     // write a newline so that the next entry in the log will be on a...newline!
-    fprintf(fp, "\n");
+    //fprintf(fp, "\n");
     fclose(fp);
 
     // unlock the mtx.
     mtx_unlock(&g_log_mtx);
+    #endif
 }
 
 void exit_log(void)
 {
+    #ifdef DEBUG
     if (g_log_flag)
     {
         mtx_destroy(&g_log_mtx);
         socketExit();
     }
+    #endif
 }

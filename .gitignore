@@ -58,3 +58,4 @@ build/
 gamecard_installer.zip
 *.nro
 *.nacp
+old_code/

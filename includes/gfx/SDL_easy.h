@@ -17,13 +17,10 @@
 
 #define SCREEN_W    1280    //width of the window
 #define SCREEN_H    720     //hight of the window
-#define COLOUR_MAX  30
+#define COLOUR_MAX  50
 
 #define DEFAULT_FPS     60
 #define TICKS_PER_FRAME (1000 / DEFAULT_FPS)
-
-#define BOX_SIZE 300 //?
-#define SPACING 44 //?
 
 
 typedef enum
@@ -120,10 +117,6 @@ typedef uint32_t Window_Flags;
 typedef uint32_t Renderer_Flags;
 
 
-TTF_Font *fntSmall,*fntMedium, *fntLarge, *fntButton, *fntButtonBig;
-SDL_Texture *example;
-
-
 SDL_Colour SDL_GetColour(Colour colour_option);                                         //pass the name of colour, returns the colour
 SDL_Window* SDL_GetWindow(void);                                                        //get sdl window
 
@@ -137,7 +130,9 @@ void SDL_DrawImage(SDL_Texture *texture, int x, int y);                         
 void SDL_DrawImageRotate(SDL_Texture *texture, int x, int y, double rotate);
 void SDL_DrawImageScale(SDL_Texture *texture, int x, int y, int w, int h);              //scale the image drawn to screen
 void SDL_DrawShape(Colour colour, int x, int y, int w, int h, bool filled);             //draw shap (rect)
+void SDL_DrawShapeEX(uint8_t r, uint8_t g, uint8_t b, uint8_t a, int x, int y, int w, int h, bool filled);
 void SDL_DrawShapeOutline(Colour colour, int x, int y, int w, int h, int thicc);
+void SDL_DrawShapeOutlineEX(uint8_t r, uint8_t g, uint8_t b, uint8_t a, int x, int y, int w, int h, int thicc);
 void SDL_DrawShapeRounded(Colour colour, int x, int y, int w, int h, int r);
 void SDL_DrawShapeRoundedOutline(Colour colour, int x, int y, int w, int h, int r);
 void SDL_DrawCircle(Colour colour, int x, int y, int r);
@@ -151,10 +146,12 @@ int SDL_GetTextureWidth(SDL_Texture *texture);
 int SDL_GetTextureHeight(SDL_Texture *texture);
 void SDL_GetTextSize(TTF_Font *font, int *w, int *h, const char *text, ...);
 
+void SDL_SetTextureColour(SDL_Texture *texture, Colour colour);
+
 void SDL_ClearRenderer(void);                                                           //clear the screen
 void SDL_UpdateRenderer(void);                                                          //update the screen
 
-void SDL_EasyInit(Window_Flags w_flags, Renderer_Flags r_flags);                                                                    //init all sdl stuff
-void SDL_EasyExit(void);                                                                    //clean and exit
+void SDL_EasyInit(Window_Flags w_flags, Renderer_Flags r_flags);                        //init all sdl stuff
+void SDL_EasyExit(void);                                                                //clean and exit
 
 #endif

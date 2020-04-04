@@ -33,6 +33,9 @@ size_t get_dir_total_recursive(const char *directory);
 //
 size_t get_dir_total_filter(const char *directory, const char *filter);
 
+//
+void list_dir(const char *directory);
+
 // create dir.
 bool create_dir(const char *dir);
 

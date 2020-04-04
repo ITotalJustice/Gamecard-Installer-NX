@@ -3,7 +3,8 @@
 
 
 #include <stdint.h>
-#include <switch.h>
+#include <switch/services/ncm.h>
+#include <switch/services/ncm_types.h>
 
 
 typedef struct 
@@ -12,33 +13,61 @@ typedef struct
     uint32_t title_version;
     uint8_t meta_type;
     uint8_t _0xD;
-    u_int16_t ext_header_size;
-    u_int16_t content_count;
-    u_int16_t content_meta_count;
+    uint16_t extended_header_size;
+    uint16_t content_count;
+    uint16_t content_meta_count;
     uint8_t attributes;
-    uint8_t _0x15[3];
+    uint8_t _0x15[0x3];
     uint32_t required_sys_version;
-    uint8_t _0x1C[4];
-} cnmt_header_t;
+    uint8_t _0x1C[0x4];
+} CnmtFullHeader_t;
 
 typedef struct
 {
-    char cnmt_name[1024];
-    FsFile cnmt_file;
-    uint32_t total_cnmt_infos;
-    NcmContentInfo cnmt_info;
-    NcmContentInfo *cnmt_infos;
-    NcmStorageId storage_id;
-} cnmt_struct_t;
+    NcmContentMetaHeader header;
+    NcmContentMetaKey key;
+    uint8_t *extended_header;   // variable size;
+    NcmContentInfo *content_infos;
+} Cnmt_t;   // i don't have a good name for this yet.
 
 
-// push the app record and set the data in the ncm database.
-void cnmt_push_record(cnmt_header_t *cnmt_header, cnmt_struct_t *cnmt_struct, void *ext_header);
+//
+bool cnmt_push_record(const NcmContentMetaKey *key, NcmStorageId storage_id);
+
+//
+bool cnmt_set_db(const NcmContentMetaKey *key, const NcmContentMetaHeader *header, const void *extended_header, const NcmContentInfo *info, NcmStorageId storage_id);
+
+// this will set required app version and required system version to 0.
+void cnmt_set_extended_header(void *extended_header, NcmContentMetaType type);
+
+//
+bool cnmt_get_header_and_key(const uint8_t *cnmt_data, NcmContentMetaHeader *header_out, NcmContentMetaKey *key_out, int64_t offset);
 
 // parse the cnmt.
-void cnmt_read_data(cnmt_struct_t *cnmt_struct);
+// cnmt_data: the data to parse.
+// offset: starting offset of the data.
+// cnmt_info: the cnmt.nca info.
+// cnmt_out: the output.
+bool cnmt_parse(const uint8_t *cnmt_data, uint64_t offset, const NcmContentInfo *cnmt_info, Cnmt_t *cnmt_out);
 
-// open the cnmt.
-Result cnmt_open(cnmt_struct_t *cnmt_struct);
+// open the installed cnmt.nca.
+bool cnmt_open_installed_file(const NcmContentId *content_id, const NcmContentInfo *cnmt_info, Cnmt_t *cnmt_out, NcmStorageId storage_id);
+
+
+/*
+*   Debug
+*/
+
+//
+void cnmt_print_header(const NcmContentMetaHeader *header, const NcmContentMetaKey *key);
+
+//
+void cnmt_print_extended_header(const void *extended_header, NcmContentMetaType type);
+
+//
+void cnmt_print_content_info(const NcmContentInfo *info);
+
+//
+void cnmt_print_content_infos(const NcmContentInfo *info, uint16_t total);
 
 #endif

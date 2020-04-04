@@ -40,7 +40,7 @@ typedef struct
     uint64_t pfs0_offset;
     uint64_t pfs0_size;
     uint8_t _0x48[0xF0];
-} pfs0_superblock_t;
+} Pfs0Superblock_t;
 
 typedef struct
 {
@@ -89,6 +89,9 @@ bool pfs0_extract_all(pfs0_struct_ptr *ptr);
 
 //
 void pfs0_free_structs(pfs0_struct_ptr *ptr);
+
+//
+bool pfs0_process(pfs0_struct_ptr *ptr, uint64_t offset, FILE *fp);
 
 //
 bool pfs0_start(FILE *file, uint64_t offset);

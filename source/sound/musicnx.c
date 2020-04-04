@@ -67,11 +67,11 @@ int play_song_thrd(void *in)
     struct timespec sleep_time = { 0, 10000000 };
 
     // loop until the flag is set to false.
-    while (g_continue_flag == true)
+    while (g_continue_flag)
     {
         // if music isn't playing, then its the end of the song.
         // or the user deleted the song, but we assume that *didn't* happen.
-        if (!Mix_PlayingMusic())
+        if (!Mix_PlayingMusic() && !Mix_PausedMusic())
         {
             play_song(g_songs[rand() % g_song_total], 0);
         }
