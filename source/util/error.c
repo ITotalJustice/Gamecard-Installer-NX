@@ -94,6 +94,8 @@ const char *error_get_description(ErrorCodes error)
             return "Not enough storage space";
         case ErrorCode_KeyGen:
             return "KeyGen too low to decrypt.";
+        case ErrorCode_NoKeyFile:
+            return "No prod.keys / keys.txt found";
 
         case ErrorCode_Unknown:
             return "Unkown Error";

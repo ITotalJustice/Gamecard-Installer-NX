@@ -623,7 +623,7 @@ bool nca_decrypt_keak(const NcaHeader_t *header, NcaKeyArea_t *out)
     return true;
 }
 
-bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen)
+bool __nca_encrypt_keak_keyz(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen)
 {
     if (!header || !decrypted_key)
     {
@@ -633,7 +633,6 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
 
     Aes128Context ctx = {0};
     NcaKeyArea_t decrypted_nca_keys[NCA_SECTION_TOTAL] = {0};
-
     memcpy(&decrypted_nca_keys[0x2].area, decrypted_key->area, sizeof(NcaKeyArea_t));
 
     const uint8_t *keak = crypto_get_keak_from_keys(header->kaek_index, key_gen);
@@ -646,6 +645,30 @@ bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, ui
     for (uint8_t i = 0; i < NCA_SECTION_TOTAL; i++)
     {
         aes128EncryptBlock(&ctx, &header->key_area[i].area, &decrypted_nca_keys[i].area);
+    }
+
+    return true;
+}
+
+bool __nca_ecnrypt_keak_spl(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen)
+{
+    /*
+    *   TODO:
+    */
+    return true;
+}
+
+bool nca_encrypt_keak(NcaHeader_t *header, const NcaKeyArea_t *decrypted_key, uint8_t key_gen)
+{
+    if (!header || !decrypted_key)
+    {
+        write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    if (!__nca_encrypt_keak_keyz(header, decrypted_key, key_gen))
+    {
+        return false;
     }
 
     // set the rights_id field.

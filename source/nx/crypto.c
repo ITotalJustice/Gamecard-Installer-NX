@@ -102,14 +102,14 @@ bool crypto_has_key_gen(NcaKeyAreaEncryptionKeyIndex index, uint32_t key_gen)
     return key_gen <= crypto_get_highest_key_gen(index);
 }
 
-bool has_keys(void)
+bool crypto_has_keys_file(void)
 {
     return g_has_keyz;
 }
 
 bool crypto_has_key_gen_from_keys(NcaKeyAreaEncryptionKeyIndex index, uint8_t key_gen)
 {
-    if (index > 0x2 || key_gen > KEYGEN_LIMIT)
+    if (!crypto_has_keys_file() || index > NcaKeyAreaEncryptionKeyIndex_System || key_gen > KEYGEN_LIMIT)
     {
         write_log("missing params in %s\n", __func__);
         return false;
@@ -131,16 +131,32 @@ const uint8_t *crypto_get_keak_from_keys(NcaKeyAreaEncryptionKeyIndex index, uin
     write_log("\n keygen: %u got key: ", key_gen);
     for (int i = 0; i < sizeof(NcaKeyArea_t); i++)
     {
-        write_log("%x", g_keyz.keak[index].key[key_gen].area[i]);
+        write_log("%X", g_keyz.keak[index].key[key_gen].area[i]);
     }
     write_log("\n");
     #endif
+
     return g_keyz.keak[index].key[key_gen].area;
 }
 
 const uint8_t *crypto_get_titlekek_from_keys(uint8_t key_gen)
 {
+    if (!crypto_has_keys_file() || key_gen > KEYGEN_LIMIT || g_keyz.title_key.total < key_gen)
+    {
+        return NULL;
+    }
+
     if (key_gen) key_gen--;
+
+    #ifdef DEBUG
+    write_log("\n keygen: %u got key: ", key_gen);
+    for (int i = 0; i < sizeof(NcaKeyArea_t); i++)
+    {
+        write_log("%X", g_keyz.title_key.key[key_gen].area[i]);
+    }
+    write_log("\n");
+    #endif
+
     return g_keyz.title_key.key[key_gen].area;
 }
 
@@ -167,12 +183,14 @@ bool find_keys_file(char **out, size_t *out_size)
         // default
         "sdmc:/switch/prod.keys",
         "sdmc:/switch/keys.txt",
+        "sdmc:/switch/gamecard_installer/prod.keys",
+        "sdmc:/switch/gamecard_installer/keys.txt",
     };
 
     FILE *fp = {0};
-    for (uint8_t i = 0; i < 2; i++)
+    for (uint8_t i = 0; i < 4; i++)
     {
-        fp = fopen(KEY_PATHS[i], "r");
+        fp = fopen(KEY_PATHS[i], "rb");
         if (fp)
         {
             *out_size = __get_file_size(fp) + 1;

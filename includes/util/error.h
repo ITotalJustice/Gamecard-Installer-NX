@@ -48,13 +48,13 @@ typedef enum
     ErrorCode_AppRecord = 0x6006,
     ErrorCode_NoSpace = 0x6007,
     ErrorCode_KeyGen = 0x6008,
+    ErrorCode_NoKeyFile = 0x6009,
 
     ErrorCode_Unknown           = 0xFFFF,
 } ErrorCodes;
 
 //
 const char *get_error_type(ErrorCodes error);
-
 const char *error_get_description(ErrorCodes error);
 
 #endif

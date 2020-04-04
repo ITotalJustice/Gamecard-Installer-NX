@@ -135,13 +135,14 @@ bool __gc_setup_string_table(GameCard_t *gamecard)
     if (!dir)
     {
         write_log("failed to open folder %s\n", __func__);
+        ui_display_error_box(ErrorCode_OpenDir, __func__);
         return false;
     }
 
     uint16_t i = 0;
     while ((d = readdir(dir)) && i < gamecard->file_table.file_count)
     {
-        strcpy(gamecard->string_table[i].name, d->d_name);
+        strncpy(gamecard->string_table[i].name, d->d_name, 0x30);
         write_log("table %s\n", gamecard->string_table[i].name);
         i++; 
     }
@@ -817,6 +818,7 @@ bool __gc_do_ticket_magic(const char *ticket_path, uint64_t id)  //nice function
     FILE *fp = fopen(ticket_path, "rb");
     if (!fp)
     {
+        ui_display_error_box(ErrorCode_OpenFile, __func__);
         write_log("failed to open file %s\n", __func__);
         return false;
     }
@@ -925,11 +927,13 @@ bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
     // set the db and push record.
     if (!cnmt_set_db(&entry->cnmt.key, &entry->cnmt.header, entry->cnmt.extended_header, entry->cnmt.content_infos, storage_id))
     {
+        ui_display_error_box(ErrorCode_NcmDb, __func__);
         return false;
     }
     
     if (!cnmt_push_record(&entry->cnmt.key, storage_id))
     {
+        ui_display_error_box(ErrorCode_AppRecord, __func__);
         return false;
     }
 
@@ -944,9 +948,11 @@ bool __gc_install(const GameCardEntry_t *entry, NcmStorageId storage_id)
         // TODO: add check to make sure that the nca is in the filetable.
         char nca_name_buffer[0x301] = {0};
         snprintf(nca_name_buffer, 0x301, "%s%s", nca_get_string_from_id(&entry->cnmt.content_infos[i].content_id, nca_name_buffer), entry->cnmt.content_infos[i].content_type == NcmContentType_Meta ? ".cnmt.nca" : ".nca");
+
         FILE *fp = fopen(nca_name_buffer, "rb");
         if (!fp)
         {
+            ui_display_error_box(ErrorCode_OpenFile, __func__);
             write_log("failed to open: %s\n", nca_name_buffer);
             return false;
         }
@@ -967,6 +973,12 @@ bool gc_install_ex(uint16_t game_pos, NcmStorageId storage_id)
     if (storage_id != NcmStorageId_BuiltInUser && storage_id != NcmStorageId_SdCard)
     {
         write_log("got wrong storage id %u %s\n", storage_id, __func__);
+        return false;
+    }
+
+    if (setting_get_install_lower_key_gen() == SettingFlag_On && !crypto_has_key_gen_from_keys(NcaKeyAreaEncryptionKeyIndex_Application, 0))
+    {
+        ui_display_error_box(ErrorCode_NoKeyFile, "");
         return false;
     }
 
