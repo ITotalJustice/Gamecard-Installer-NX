@@ -542,15 +542,23 @@ void ui_display_detailed_gamecard(void)
 
         if (input.down & KEY_L)
         {
-            cursor = move_cursor_up(cursor, g_game_info.total_count);
-            free_game_info_detailed(&info);
-            gc_setup_detailed_game_info(&info, cursor);
+            // ensure that we have at least one entry (we always should) then check if we have more than one.
+            if (g_game_info.total_count && g_game_info.total_count -1)
+            {
+                cursor = move_cursor_up(cursor, g_game_info.total_count);
+                free_game_info_detailed(&info);
+                gc_setup_detailed_game_info(&info, cursor);
+            }
         }
         if (input.down & KEY_R)
         {
-            cursor = move_cursor_down(cursor, g_game_info.total_count);
-            free_game_info_detailed(&info);
-            gc_setup_detailed_game_info(&info, cursor);
+            // same as above.
+            if (g_game_info.total_count && g_game_info.total_count -1)
+            {
+                cursor = move_cursor_down(cursor, g_game_info.total_count);
+                free_game_info_detailed(&info);
+                gc_setup_detailed_game_info(&info, cursor);
+            }
         }
 
         ui_display_dim_background();
