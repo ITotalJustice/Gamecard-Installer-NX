@@ -636,11 +636,42 @@ uint16_t gc_get_current_dlc_count(void)
 *   Change GameInfo.
 */
 
+const GameCardEntry_t *__gc_get_gamecard_entry(uint16_t game_pos, uint16_t entry_pos)
+{
+    // ensure that we have a game in pos and a game-entry.
+    if (game_pos >= GAMECARD.file_table.game_count || entry_pos >= GAMECARD.entries[game_pos].total_count)
+    {
+        write_log("missing params in %s\n", __func__);
+        return NULL;
+    }
+
+    if (entry_pos < GAMECARD.entries[game_pos].base_count)
+    {
+        return &GAMECARD.entries[game_pos].base[entry_pos];
+    }
+    else if (entry_pos < GAMECARD.entries[game_pos].base_count + GAMECARD.entries[game_pos].upp_count)
+    {
+        return &GAMECARD.entries[game_pos].upp[entry_pos - GAMECARD.entries[game_pos].base_count];
+    }
+    else
+    {
+        return &GAMECARD.entries[game_pos].dlc[entry_pos - (GAMECARD.entries[game_pos].base_count + GAMECARD.entries[game_pos].upp_count)];
+    }
+}
+
 bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
 {
     if (!out_info || game_pos >= GAMECARD.file_table.game_count)
     {
         write_log("missing params in %s\n", __func__);
+        return false;
+    }
+
+    // get the first entry.
+    // this ensures that even if the user mounts an xci with only a update / dlc entry, the info will still be shown.
+    const GameCardEntry_t *tmp_entry = __gc_get_gamecard_entry(game_pos, 0);
+    if (!tmp_entry)
+    {
         return false;
     }
 
@@ -657,15 +688,15 @@ bool gc_setup_game_info(GameInfo_t *out_info, uint16_t game_pos)
     }
 
     // store the values.
-    out_info->app_id = GAMECARD.entries[game_pos].base[0].cnmt.key.id;
-    out_info->key_gen = GAMECARD.entries[game_pos].base[0].key_gen;
+    out_info->app_id = tmp_entry->cnmt.key.id;
+    out_info->key_gen = tmp_entry->key_gen;
     out_info->base_count = GAMECARD.entries[game_pos].base_count;
     out_info->upp_count = GAMECARD.entries[game_pos].upp_count;
     out_info->dlc_count = GAMECARD.entries[game_pos].dlc_count;
     out_info->total_count = GAMECARD.entries[game_pos].total_count;
 
     // create the textures.
-    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", GAMECARD.entries[game_pos].base[0].cnmt.key.id);
+    out_info->text_app_id = create_text(&FONT_TEXT[QFontSize_18], 50, 495, Colour_Nintendo_White, "App-ID: 0%lX", tmp_entry->cnmt.key.id);
     out_info->text_key_gen = create_text(&FONT_TEXT[QFontSize_18], 50, 535, Colour_Nintendo_White, "Key-Gen: %u (%s)", out_info->key_gen, nca_return_key_gen_string(out_info->key_gen));
     out_info->text_size = create_text(&FONT_TEXT[QFontSize_18], 50, 575, Colour_Nintendo_White, "Size: %.2f %s", game_size, size_type_text);
     out_info->text_entry_contents = create_text(&FONT_TEXT[QFontSize_18], 50, 615, Colour_Nintendo_White, "Base: %u Upp: %u DLC: %u", GAMECARD.entries[game_pos].base_count, GAMECARD.entries[game_pos].upp_count, GAMECARD.entries[game_pos].dlc_count);
@@ -699,18 +730,10 @@ bool gc_setup_detailed_game_info(GameInfoDetailed_t *info_out, uint16_t entry)
     }
 
     // get the entry.
-    const GameCardEntry_t *tmp_entry = {0};
-    if (entry < GAMECARD.entries[g_game_pos].base_count)
+    const GameCardEntry_t *tmp_entry = __gc_get_gamecard_entry(g_game_pos, entry);
+    if (!tmp_entry)
     {
-        tmp_entry = &GAMECARD.entries[g_game_pos].base[entry];
-    }
-    else if (entry < GAMECARD.entries[g_game_pos].base_count + GAMECARD.entries[g_game_pos].upp_count)
-    {
-        tmp_entry = &GAMECARD.entries[g_game_pos].upp[entry - GAMECARD.entries[g_game_pos].base_count];
-    }
-    else
-    {
-        tmp_entry = &GAMECARD.entries[g_game_pos].dlc[entry - (GAMECARD.entries[g_game_pos].base_count + GAMECARD.entries[g_game_pos].upp_count)];
+        return false;
     }
 
     // setup the vars.

@@ -520,6 +520,15 @@ void ui_display_gamecard(void)
 
 void ui_display_detailed_gamecard(void)
 {
+    // initial info setup.
+    uint16_t cursor = 0;
+    GameInfoDetailed_t info = {0};
+    if (!gc_setup_detailed_game_info(&info, cursor))
+    {
+        return;
+    }
+
+    // the size of the pop-up box.
     const SDL_Rect box = { 255 / 1.5, 145 / 1.5, SCREEN_W - (box.x  * 2), SCREEN_H - (box.y * 2)};
 
     button_t *l_button = create_button(&FONT_BUTTON[QFontSize_23], 845, box.y + 480, Colour_Nintendo_White, Font_Button_L);
@@ -527,13 +536,14 @@ void ui_display_detailed_gamecard(void)
     text_t *swap_text = create_text(&FONT_TEXT[QFontSize_23], 910, box.y + 480, Colour_Nintendo_White, "Swap Entry");
     text_t *title = create_text(&FONT_TEXT[QFontSize_28], box.x + 60, box.y + 30, Colour_Nintendo_White, "Game-Info");
 
-    uint16_t cursor = 0;
-    GameInfoDetailed_t info = {0};
-    gc_setup_detailed_game_info(&info, cursor);
-
     while (appletMainLoop())
     {
         input_t input = get_input();
+
+        if (input.down)
+        {
+            play_sound(g_sound_effects.move, -1, 0);
+        }
 
         if (input.down & KEY_B)
         {
@@ -547,7 +557,10 @@ void ui_display_detailed_gamecard(void)
             {
                 cursor = move_cursor_up(cursor, g_game_info.total_count);
                 free_game_info_detailed(&info);
-                gc_setup_detailed_game_info(&info, cursor);
+                if (!gc_setup_detailed_game_info(&info, cursor))
+                {
+                    break;
+                }
             }
         }
         if (input.down & KEY_R)
@@ -557,7 +570,10 @@ void ui_display_detailed_gamecard(void)
             {
                 cursor = move_cursor_down(cursor, g_game_info.total_count);
                 free_game_info_detailed(&info);
-                gc_setup_detailed_game_info(&info, cursor);
+                if (!gc_setup_detailed_game_info(&info, cursor))
+                {
+                    break;
+                }
             }
         }
 
