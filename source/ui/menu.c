@@ -1153,8 +1153,11 @@ uint8_t handle_input(void)
 
     else if (input.down & KEY_Y)
     {
-        play_sound(g_sound_effects.move, -1, 0);
-        ui_display_detailed_gamecard();
+        if (g_gc_inserted)
+        {
+            play_sound(g_sound_effects.move, -1, 0);
+            ui_display_detailed_gamecard();
+        }
     }
 
     else if (input.down & KEY_A)
