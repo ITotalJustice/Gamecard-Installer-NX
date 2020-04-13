@@ -596,6 +596,7 @@ void ui_display_detailed_gamecard(void)
     free_button(r_button);
     free_text(swap_text);
     free_text(title);
+    free_game_info_detailed(&info);
 }
 
 void ui_display_button_spin(void)
