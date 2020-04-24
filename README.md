@@ -1,4 +1,12 @@
-# Gamecard-Installer-NX
+# THIS PROJECT IS ARCHIVED.
+
+I am no longer updating any of my switch homebrew apps. This also means that there will be no more public releases made by me.
+
+Thank you to everyone that was kind to me along the way.
+
+----
+
+## Gamecard-Installer-NX
 
 A way to install your gamecards directly to the switch!
 
